@@ -14,11 +14,12 @@ cp "$root/README.md" "$dist/"
 cp "$root/LICENSE" "$dist/"
 cp -R "$root/src" "$dist/"
 
-# Documentation/support files used by README and manual examples.
+# Documentation/support files used by README links.
 # These are intentionally committed for Typst Universe display, but excluded
 # from the downloaded package archive via typst.toml `exclude` patterns.
-if [[ -d "$root/docs" ]]; then
-	cp -R "$root/docs" "$dist/"
+if [[ -d "$root/docs/images" ]]; then
+	mkdir -p "$dist/docs"
+	cp -R "$root/docs/images" "$dist/docs/"
 fi
 
 if [[ -d "$root/assets" ]]; then
