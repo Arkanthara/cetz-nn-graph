@@ -9,7 +9,7 @@
 == Quick start
 
 ```typ
-#import "@preview/cetz-nn-graph:0.1.0": *
+#import "@preview/neural-viz:0.1.0": *
 
 #graph-canvas({
   let ds = make-dataset("Image\nDataset", pos: (1.0, 0.0))

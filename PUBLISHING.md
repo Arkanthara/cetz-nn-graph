@@ -34,8 +34,8 @@ git checkout main
 Create the target directory and copy files:
 
 ```sh
-mkdir -p packages/preview/cetz-nn-graph/0.1.0
-cp -R /path/to/cetz-nn-graph/dist/package/. packages/preview/cetz-nn-graph/0.1.0/
+mkdir -p packages/preview/neural-viz/0.1.0
+cp -R /path/to/neural-viz/dist/package/. packages/preview/neural-viz/0.1.0/
 ```
 
 ## 4. Commit/exclude model used here
