@@ -1,5 +1,8 @@
 #import "../internal/geometry.typ": resolve-node-center
 
+/// Build a rectangular processing node.
+///
+/// Width/height are auto-estimated from text unless `size` is provided.
 #let make-box(
   title,
   subtitle: none,

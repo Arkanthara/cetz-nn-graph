@@ -1,5 +1,8 @@
 #import "../internal/geometry.typ": resolve-node-center
 
+/// Build an encoder/decoder trapezoid node.
+///
+/// Set `mode: "decoder"` to mirror the shape.
 #let make-trapezoid(
   title,
   subtitle: none,

@@ -2,6 +2,7 @@
 #import "../internal/text.typ": fit-lines
 #import "../internal/geometry.typ": chars-cap, node-size, node-edge
 
+/// Draw one node returned by any `make-*` constructor.
 #let draw-node(node) = {
   import draw: *
 
@@ -117,5 +118,18 @@
       content((node.cx, node.cy - 0.36), align(center)[#text(size: node.subtitle-size)[#s]])
     }
     draw-legend(node.cx, node.cy)
+  }
+}
+
+/// Draw a tuple of nodes.
+///
+/// Example:
+/// ```typ
+/// let nodes = (a, b, c)
+/// draw-nodes(nodes)
+/// ```
+#let draw-nodes(nodes) = {
+  for i in range(nodes.len()) {
+    draw-node(nodes.at(i))
   }
 }

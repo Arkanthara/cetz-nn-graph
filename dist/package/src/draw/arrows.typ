@@ -76,11 +76,91 @@
   let adx = calc.abs(dx)
   let ady = calc.abs(dy)
 
+  let normalize-segment-index(raw, n) = {
+    if type(raw) != int {
+      none
+    } else if raw > 0 and raw <= n {
+      raw
+    } else if raw == 0 {
+      n
+    } else if raw < 0 {
+      let idx = n + raw + 1
+      if idx >= 1 and idx <= n { idx } else { none }
+    } else {
+      none
+    }
+  }
+
+  let normalize-segment-length(raw) = {
+    if raw == none {
+      none
+    } else if type(raw) == int or type(raw) == float {
+      raw
+    } else {
+      none
+    }
+  }
+
+  let mode-shifts-direct-indexed = {
+    if mode-shifts == none or mode-shifts.len() < 2 {
+      false
+    } else {
+      let has-int-index = type(mode-shifts.at(0, default: none)) == int
+      let has-numeric-length = normalize-segment-length(mode-shifts.at(1, default: none)) != none
+      has-int-index and has-numeric-length
+    }
+  }
+
+  let mode-shifts-indexed-list = {
+    if mode-shifts == none or mode-shifts.len() == 0 {
+      false
+    } else {
+      let first = mode-shifts.at(0, default: none)
+      let is-pair = type(first) == array and first.len() >= 2
+      if not is-pair {
+        false
+      } else {
+        let has-int-index = type(first.at(0, default: none)) == int
+        let has-numeric-length = normalize-segment-length(first.at(1, default: none)) != none
+        has-int-index and has-numeric-length
+      }
+    }
+  }
+
+  let mode-shifts-indexed = mode-shifts-direct-indexed or mode-shifts-indexed-list
+
+  let indexed-mode-shift(i) = {
+    if not mode-shifts-indexed {
+      none
+    } else if mode-shifts-direct-indexed {
+      let idx = normalize-segment-index(mode-shifts.at(0), n)
+      let val = normalize-segment-length(mode-shifts.at(1))
+      if idx != none and idx == i { val } else { none }
+    } else {
+      let found = none
+      for j in range(mode-shifts.len()) {
+        let entry = mode-shifts.at(j)
+        if type(entry) == array and entry.len() >= 2 {
+          let idx = normalize-segment-index(entry.at(0), n)
+          let val = normalize-segment-length(entry.at(1))
+          if idx != none and idx == i and val != none {
+            found = val
+          }
+        }
+      }
+      found
+    }
+  }
+
   let seg-override(i) = {
-    if mode-shifts != none and i <= mode-shifts.len() {
-      mode-shifts.at(i - 1, default: none)
-    } else if mode-shift != none and mode-shift.len() >= 2 and mode-shift.at(0) == i {
-      mode-shift.at(1)
+    if mode-shifts-indexed {
+      indexed-mode-shift(i)
+    } else if mode-shifts != none and i <= mode-shifts.len() {
+      normalize-segment-length(mode-shifts.at(i - 1, default: none))
+    } else if mode-shift != none and mode-shift.len() >= 2 {
+      let idx = normalize-segment-index(mode-shift.at(0), n)
+      let val = normalize-segment-length(mode-shift.at(1))
+      if idx != none and idx == i { val } else { none }
     } else {
       none
     }
@@ -92,14 +172,18 @@
   let v-unk = 0
   let h-last = 0
   let v-last = 0
+  let h-last-overridden = false
+  let v-last-overridden = false
   for i in range(1, n + 1) {
     let axis = segs.at(i - 1)
     let ov = seg-override(i)
     if axis == "h" {
       h-last = i
+      h-last-overridden = ov != none
       if ov == none { h-unk += 1 } else { h-known += ov }
     } else {
       v-last = i
+      v-last-overridden = ov != none
       if ov == none { v-unk += 1 } else { v-known += ov }
     }
   }
@@ -108,8 +192,8 @@
   let v-rem = ady - v-known
   let h-each = if h-unk > 0 { h-rem / h-unk } else { 0 }
   let v-each = if v-unk > 0 { v-rem / v-unk } else { 0 }
-  let h-adjust = if h-unk == 0 { h-rem } else { 0 }
-  let v-adjust = if v-unk == 0 { v-rem } else { 0 }
+  let h-adjust = if h-unk == 0 and not h-last-overridden { h-rem } else { 0 }
+  let v-adjust = if v-unk == 0 and not v-last-overridden { v-rem } else { 0 }
 
   let seg-lens = ()
   for i in range(1, n + 1) {

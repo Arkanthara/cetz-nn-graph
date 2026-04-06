@@ -1,6 +1,12 @@
 #import "../internal/text.typ": truncate-title
 #import "../internal/geometry.typ": resolve-node-center
 
+/// Build a stacked dataset node.
+///
+/// Example:
+/// ```typ
+/// let ds = make-dataset("Image\\nDataset", images: 3, pos: (1.0, 0.0))
+/// ```
 #let make-dataset(
   title,
   subtitle: none,

@@ -8,39 +8,75 @@
   (w, h)
 }
 
-#let fit-image-content(content, target-w, target-h, fit: "cover") = context {
+#let resolve-fit-geometry(target-w, target-h, content-aspect, fit: "cover") = {
+  let safe-aspect = if content-aspect > 0 { content-aspect } else { target-w / target-h }
+  let target-aspect = target-w / target-h
+
+  if fit == "stretch" {
+    (target-w, target-h, true)
+  } else if fit == "contain" {
+    if safe-aspect > target-aspect {
+      (target-w, target-w / safe-aspect, false)
+    } else {
+      (target-h * safe-aspect, target-h, false)
+    }
+  } else {
+    if safe-aspect > target-aspect {
+      (target-h * safe-aspect, target-h, true)
+    } else {
+      (target-w, target-w / safe-aspect, true)
+    }
+  }
+}
+
+#let fit-image-content(content, target-w, target-h, fit: "cover", shift-x: 0.0, shift-y: 0.0) = context {
   let m = measure(content)
   let cw = if m.width > 0pt { m.width } else { target-w }
   let ch = if m.height > 0pt { m.height } else { target-h }
-  let sx = target-w / cw
-  let sy = target-h / ch
+  let content-aspect = cw / ch
+  let (render-w, render-h, clip-image) = resolve-fit-geometry(target-w, target-h, content-aspect, fit: fit)
+  let kx = render-w / cw
+  let ky = render-h / ch
 
-  let (kx, ky, clip-image) = if fit == "stretch" {
-    (sx, sy, true)
-  } else if fit == "contain" {
-    let k = calc.min(sx, sy)
-    (k, k, false)
-  } else {
-    let k = calc.max(sx, sy)
-    (k, k, true)
-  }
+  let shift-x = calc.clamp(shift-x, -1.0, 1.0)
+  let shift-y = calc.clamp(shift-y, -1.0, 1.0)
+  let dx = (render-w - target-w) / 2 * shift-x
+  let dy = (render-h - target-h) / 2 * shift-y
 
   box(width: target-w, height: target-h, inset: 0pt, clip: clip-image)[
-    #align(center + horizon)[#scale(x: kx * 100%, y: ky * 100%)[#content]]
+    #place(center, dx: dx, dy: dy)[#scale(x: kx * 100%, y: ky * 100%)[#content]]
   ]
 }
 
-#let resolve-image(src, img, w, h, unit: 0.72cm, fit: "cover", pad: 0.1) = {
+#let fit-image-source(src, target-w, target-h, fit: "cover", shift-x: 0.0, shift-y: 0.0) = context {
+  let probe = measure(image(src, width: 100pt))
+  let source-aspect = if probe.width > 0pt and probe.height > 0pt {
+    probe.width / probe.height
+  } else {
+    target-w / target-h
+  }
+
+  let (render-w, render-h, clip-image) = resolve-fit-geometry(target-w, target-h, source-aspect, fit: fit)
+  let shift-x = calc.clamp(shift-x, -1.0, 1.0)
+  let shift-y = calc.clamp(shift-y, -1.0, 1.0)
+  let dx = (render-w - target-w) / 2 * shift-x
+  let dy = (render-h - target-h) / 2 * shift-y
+
+  box(width: target-w, height: target-h, inset: 0pt, clip: clip-image)[
+    #place(center, dx: dx, dy: dy)[#image(src, width: render-w, height: render-h, fit: "stretch")]
+  ]
+}
+
+#let resolve-image(src, img, w, h, unit: 0.72cm, fit: "cover", pad: 0.1, shift-x: 0.0, shift-y: 0.0) = {
   let iw = calc.max(0.01, w - 2 * pad)
   let ih = calc.max(0.01, h - 2 * pad)
   let target-w = iw * unit
   let target-h = ih * unit
 
   if src != none {
-    // Native image fitting is more robust for file-backed images (jpg/png/svg).
-    image(src, width: target-w, height: target-h, fit: fit)
+    fit-image-source(src, target-w, target-h, fit: fit, shift-x: shift-x, shift-y: shift-y)
   } else if img != none {
-    fit-image-content(img, target-w, target-h, fit: fit)
+    fit-image-content(img, target-w, target-h, fit: fit, shift-x: shift-x, shift-y: shift-y)
   } else {
     none
   }
@@ -58,6 +94,8 @@
   image-height: none,
   image-fit: "cover",
   image-pad: 0.1,
+  image-shift-x: 0.0,
+  image-shift-y: 0.0,
   unit: 0.72cm,
   title-truncate: false,
   max-title-chars: 18,
@@ -91,7 +129,17 @@
     legend-size: legend-size,
     wrap-lines: wrap-lines,
     title-position: title-position,
-    image: resolve-image(src, img, w, h, unit: unit, fit: image-fit, pad: image-pad),
+    image: resolve-image(
+      src,
+      img,
+      w,
+      h,
+      unit: unit,
+      fit: image-fit,
+      pad: image-pad,
+      shift-x: image-shift-x,
+      shift-y: image-shift-y,
+    ),
   )
 }
 
@@ -109,6 +157,8 @@
   image-spacing: 0.22,
   image-fit: "cover",
   image-pad: 0.0,
+  image-shift-x: 0.0,
+  image-shift-y: 0.0,
   unit: 0.72cm,
   title-truncate: false,
   max-title-chars: 18,
@@ -144,6 +194,16 @@
     legend-size: legend-size,
     wrap-lines: wrap-lines,
     title-position: title-position,
-    image: resolve-image(src, img, w, h, unit: unit, fit: image-fit, pad: image-pad),
+    image: resolve-image(
+      src,
+      img,
+      w,
+      h,
+      unit: unit,
+      fit: image-fit,
+      pad: image-pad,
+      shift-x: image-shift-x,
+      shift-y: image-shift-y,
+    ),
   )
 }

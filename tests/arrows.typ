@@ -219,6 +219,112 @@
 )
 
 #showcase(
+  "draw-arrows mixed in/out side distribution",
+  join_lines((
+    "#graph-canvas({",
+    "  let source = make-box(\"Source\", pos: (1.5, 1.4))",
+    "  let sink = make-box(\"Sink\", pos: (1.5, -1.4))",
+    "  let compare = make-box(\"Compare\", pos: (7.0, 0.0))",
+    "",
+    "  draw-node(source)",
+    "  draw-node(sink)",
+    "  draw-node(compare)",
+    "",
+    "  let arrows = (",
+    "    make-arrow(source, compare, out-side: \"right\", in-side: \"left\", label: [in]),",
+    "    make-arrow(compare, sink, out-side: \"left\", in-side: \"right\", label: [out]),",
+    "  )",
+    "  draw-arrows(arrows)",
+    "})",
+  )),
+  {
+    graph-canvas({
+      let source = make-box("Source", pos: (1.5, 1.4))
+      let sink = make-box("Sink", pos: (1.5, -1.4))
+      let compare = make-box("Compare", pos: (7.0, 0.0))
+
+      draw-node(source)
+      draw-node(sink)
+      draw-node(compare)
+
+      let arrows = (
+        make-arrow(source, compare, out-side: "right", in-side: "left", label: [in]),
+        make-arrow(compare, sink, out-side: "left", in-side: "right", label: [out]),
+      )
+      draw-arrows(arrows)
+    })
+  }
+)
+
+#showcase(
+  "draw-arrows explicit endpoint order",
+  join_lines((
+    "#graph-canvas({",
+    "  let top = make-box(\"Top\", pos: (1.6, 1.4))",
+    "  let bottom = make-box(\"Bottom\", pos: (1.6, -1.4))",
+    "  let target = make-box(\"Target\", pos: (7.0, 0.0))",
+    "",
+    "  draw-nodes((top, bottom, target))",
+    "",
+    "  let arrows = (",
+    "    make-arrow(top, target, in-side: \"left\", order: 2, label: [second]),",
+    "    make-arrow(bottom, target, in-side: \"left\", order: 1, label: [first]),",
+    "  )",
+    "  draw-arrows(arrows)",
+    "})",
+  )),
+  {
+    graph-canvas({
+      let top = make-box("Top", pos: (1.6, 1.4))
+      let bottom = make-box("Bottom", pos: (1.6, -1.4))
+      let target = make-box("Target", pos: (7.0, 0.0))
+
+      draw-nodes((top, bottom, target))
+
+      let arrows = (
+        make-arrow(top, target, in-side: "left", order: 2, label: [second]),
+        make-arrow(bottom, target, in-side: "left", order: 1, label: [first]),
+      )
+      draw-arrows(arrows)
+    })
+  }
+)
+
+#showcase(
+  "draw-arrows same order uses code order",
+  join_lines((
+    "#graph-canvas({",
+    "  let a = make-box(\"A\", pos: (1.5, 1.4))",
+    "  let b = make-box(\"B\", pos: (1.5, -1.4))",
+    "  let target = make-box(\"Target\", pos: (7.0, 0.0))",
+    "",
+    "  draw-nodes((a, b, target))",
+    "",
+    "  let arrows = (",
+    "    make-arrow(a, target, in-side: \"left\", order: 1, label: [first in code]),",
+    "    make-arrow(b, target, in-side: \"left\", order: 1, label: [second in code]),",
+    "  )",
+    "  draw-arrows(arrows)",
+    "})",
+  )),
+  {
+    graph-canvas({
+      let a = make-box("A", pos: (1.5, 1.4))
+      let b = make-box("B", pos: (1.5, -1.4))
+      let target = make-box("Target", pos: (7.0, 0.0))
+
+      draw-nodes((a, b, target))
+
+      let arrows = (
+        make-arrow(a, target, in-side: "left", order: 1, label: [first in code]),
+        make-arrow(b, target, in-side: "left", order: 1, label: [second in code]),
+      )
+      draw-arrows(arrows)
+    })
+  }
+)
+
+#showcase(
   "draw-arrows with auto-distribute false",
   join_lines((
     "#graph-canvas({",

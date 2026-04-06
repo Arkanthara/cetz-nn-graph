@@ -1,5 +1,8 @@
 #import "dataset.typ": make-dataset
 
+/// Build a latent-space block.
+///
+/// This is a thin dataset convenience wrapper with one stacked card.
 #let make-latent-space(
   title,
   subtitle: none,

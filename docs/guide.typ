@@ -16,15 +16,12 @@
   let enc = make-trapezoid("Feature\nEncoder", subtitle: "Conv stack", after: ds, gap: 1.2)
   let head = make-box("Head", subtitle: "Prediction", after: enc, gap: 1.2)
 
-  draw-node(ds)
-  draw-node(enc)
-  draw-node(head)
-
+  let nodes = (ds, enc, head)
   let arrows = (
     make-arrow(ds, enc, from-outer: true, label: [input]),
     make-arrow(enc, head, label: [features]),
   )
-  draw-arrows(arrows)
+  draw-graph(nodes: nodes, arrows: arrows)
 })
 ```
 
@@ -34,15 +31,12 @@ Rendered output:
   let enc = make-trapezoid("Feature\nEncoder", subtitle: "Conv stack", after: ds, gap: 1.2)
   let head = make-box("Head", subtitle: "Prediction", after: enc, gap: 1.2)
 
-  draw-node(ds)
-  draw-node(enc)
-  draw-node(head)
-
+  let nodes = (ds, enc, head)
   let arrows = (
     make-arrow(ds, enc, from-outer: true, label: [input]),
     make-arrow(enc, head, label: [features]),
   )
-  draw-arrows(arrows)
+  draw-graph(nodes: nodes, arrows: arrows)
 })
 
 == Helpers
@@ -54,6 +48,24 @@ Wraps a CeTZ canvas and imports `draw` for you.
 #graph-canvas({
   let ds = make-dataset("Dataset", pos: (1.0, 0.0))
   draw-node(ds)
+})
+```
+
+=== `draw-nodes(nodes)` and `draw-graph(nodes, arrows, auto-distribute: true)`
+Draws many nodes and arrows with one call.
+
+```typ
+#graph-canvas({
+  let a = make-box("A", pos: (1.0, 0.0))
+  let b = make-box("B", after: a, gap: 1.2)
+  let c = make-box("C", pos: (3.8, -1.8))
+
+  let nodes = (a, b, c)
+  let arrows = (
+    make-arrow(a, b, label: [main]),
+    make-arrow(c, b, in-side: "bottom", label: [aux]),
+  )
+  draw-graph(nodes: nodes, arrows: arrows)
 })
 ```
 
@@ -101,8 +113,13 @@ Creates rectangular processing blocks with optional auto sizing.
 ```
 
 === `make-image-node(...)`
-Creates a single-image node. Image content is auto-scaled and center-cropped to
-the target frame so node geometry and positioning stay consistent.
+Creates a single-image node. Image content is auto-scaled and cropped to the
+target frame so node geometry and positioning stay consistent. Use
+`image-shift-x` and `image-shift-y` to pan the crop window inside the frame.
+Use values in the `-1` to `1` range, where `0` keeps the image centered.
+Positive `image-shift-x` moves the image to the right; positive
+`image-shift-y` moves it downward.
+This behavior is consistent for both `src:` file images and prebuilt `img:` content.
 
 ```typ
 #let img = make-image-node(
@@ -111,6 +128,8 @@ the target frame so node geometry and positioning stay consistent.
   image-width: 2.2,
   image-height: 2.2,
   image-pad: 0.08,
+  image-shift-x: 0.25,
+  image-shift-y: -0.1,
   unit: 0.72cm,
   title-position: "below",
   pos: (1.0, 0.0),
@@ -119,6 +138,7 @@ the target frame so node geometry and positioning stay consistent.
 
 === `make-image-dataset(...)`
 Creates a stacked dataset node that reuses the same fitted image on every layer.
+The same crop-shift options apply here as well.
 
 ```typ
 #let ds = make-image-dataset(
@@ -129,6 +149,7 @@ Creates a stacked dataset node that reuses the same fitted image on every layer.
   image-height: 2.1,
   image-spacing: 0.16,
   image-pad: 0.08,
+  image-shift-x: -0.2,
   unit: 0.72cm,
   title-position: "below",
   pos: (3.8, 0.0),
@@ -181,8 +202,79 @@ Builds orthogonal routes between nodes and renders one arrow or a grouped tuple.
 })
 ```
 
+`make-arrow` accepts one endpoint ordering control:
+- `order`: explicit rank used for both source and destination endpoints.
+
+Lower values are placed first. If two arrows share the same order value, the
+arrow that appears first in code is placed first.
+
+Routing tip: You can keep automatic routing while constraining one segment
+length with `mode-shift: (i, len)`.
+- `i` is 1-based.
+- `i = 0` or `i = -1` targets the last segment.
+- Unspecified segments remain automatic.
+
+Routing controls overview:
+- `mode`: a string made of `h` and `v` (for example `hv`, `vh`, `hvh`, `vhvh`, `hvhvh`).
+- `mode-shift`: one override tuple `(i, len)`.
+- `mode-shifts`: multiple overrides with two accepted forms.
+
+`mode-shifts` form A (positional lengths):
+- Example: `mode: "vhvh", mode-shifts: (none, 1.2, none, 0.8)`.
+- Entry `k` controls segment `k`.
+- Use `none` to keep that segment automatic.
+
+`mode-shifts` form B (indexed overrides):
+- Example: `mode: "vhvh", mode-shifts: ((1, 1.0), (-1, 0.8))`.
+- First value is segment index, second value is fixed length.
+- Supports positive indices, `0`, and negative-from-end indices.
+
+Precedence:
+- If `mode-shifts` is provided, it takes precedence.
+- `mode-shift` is used only when `mode-shifts` is not provided.
+
+```typ
+#let feedback = make-arrow(
+  dec,
+  enc,
+  out-side: "bottom",
+  in-side: "left",
+  mode: "vhvh",
+  mode-shift: (0, 1.0),
+)
+```
+
+```typ
+#let feedback2 = make-arrow(
+  dec,
+  enc,
+  out-side: "top",
+  in-side: "left",
+  mode: "vhvh",
+  mode-shifts: ((1, 1.0), (-1, 0.8)),
+)
+```
+
+```typ
+#graph-canvas({
+  let a = make-box("A", pos: (1.0, 1.4))
+  let b = make-box("B", pos: (1.0, -1.4))
+  let target = make-box("Target", pos: (6.0, 0.0))
+
+  draw-nodes((a, b, target))
+
+  let arrows = (
+    // Left side ordering is top-to-bottom.
+    make-arrow(a, target, in-side: "left", order: 2, label: [second]),
+    make-arrow(b, target, in-side: "left", order: 1, label: [first]),
+  )
+  draw-arrows(arrows)
+})
+```
+
 Tip: Use `draw-arrows((...))` when several arrows share one node side. Anchors
-are spread evenly along that side by default. Set
+for both incoming and outgoing endpoints are spread evenly along that side by
+default. Set
 `draw-arrows(arrows, auto-distribute: false)` to disable this behavior.
 
 == Emoji markers

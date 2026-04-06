@@ -231,6 +231,8 @@
     "    image-width: 2.2,",
     "    image-height: 2.2,",
     "    image-pad: 0.08,",
+    "    image-shift-x: 0.18,",
+    "    image-shift-y: -0.12,",
     "    unit: 0.72cm,",
     "    title-position: \"below\",",
     "    pos: (2.0, 0.0),",
@@ -240,6 +242,7 @@
     "    img: image(\"/assets/sample.svg\", width: 5cm),",
     "    image-size: (1.8, 2.2),",
     "    image-pad: 0.08,",
+    "    image-shift-x: -0.1,",
     "    unit: 0.72cm,",
     "    title-position: \"below\",",
     "    after: from_src,",
@@ -254,10 +257,12 @@
     graph-canvas({
       let from_src = make-image-node(
         "Single\nImage",
-          src: "/assets/test.jpg",
+        src: "/assets/test.jpg",
         image-width: 2.2,
         image-height: 2.2,
         image-pad: 0.08,
+        image-shift-x: 0.18,
+        image-shift-y: -0.12,
         unit: 0.72cm,
         title-position: "below",
         pos: (2.0, 0.0),
@@ -267,6 +272,7 @@
         img: image("/assets/sample.svg", width: 5cm),
         image-size: (1.8, 2.2),
         image-pad: 0.08,
+        image-shift-x: -0.1,
         unit: 0.72cm,
         title-position: "below",
         after: from_src,
@@ -291,6 +297,8 @@
     "    image-height: 2.1,",
     "    image-spacing: 0.16,",
     "    image-pad: 0.08,",
+    "    image-shift-x: -0.22,",
+    "    image-shift-y: 0.08,",
     "    unit: 0.72cm,",
     "    title-position: \"below\",",
     "    pos: (2.0, 0.0),",
@@ -303,12 +311,14 @@
     graph-canvas({
       let ds = make-image-dataset(
         "Image\nDataset",
-          src: "/assets/test.jpg",
+        src: "/assets/test.jpg",
         images: 4,
         image-width: 1.6,
         image-height: 2.1,
         image-spacing: 0.16,
         image-pad: 0.08,
+        image-shift-x: -0.22,
+        image-shift-y: 0.08,
         unit: 0.72cm,
         title-position: "below",
         pos: (2.0, 0.0),
@@ -341,6 +351,28 @@
       )
 
       draw-node(latent)
+    })
+  }
+)
+
+#showcase(
+  "draw-nodes helper",
+  join_lines((
+    "#graph-canvas({",
+    "  let a = make-box(\"A\", pos: (1.2, 0.0))",
+    "  let b = make-box(\"B\", after: a, gap: 1.2)",
+    "  let c = make-box(\"C\", pos: (1.2, -2.0))",
+    "",
+    "  draw-nodes((a, b, c))",
+    "})",
+  )),
+  {
+    graph-canvas({
+      let a = make-box("A", pos: (1.2, 0.0))
+      let b = make-box("B", after: a, gap: 1.2)
+      let c = make-box("C", pos: (1.2, -2.0))
+
+      draw-nodes((a, b, c))
     })
   }
 )

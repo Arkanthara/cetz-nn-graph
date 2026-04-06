@@ -1,5 +1,6 @@
 #import "@preview/cetz:0.4.2": draw
 #import "../internal/geometry.typ": node-edge
+#import emoji: *
 
 #let draw-node-emoji(
   node,
@@ -21,19 +22,19 @@
   let symbol = if emoji != none {
     emoji
   } else if kind == "lock-open" {
-    [UNLOCK]
+    lock.open
   } else if kind == "key" {
-    [KEY]
+    key
   } else {
-    [LOCK]
+    lock
   }
 
   let status = if state-text != none {
     state-text
   } else if key-state == "encrypted" {
-    [LOCK]
+    lock.key
   } else if key-state == "decrypted" {
-    [UNLOCK]
+    lock.open
   } else {
     none
   }

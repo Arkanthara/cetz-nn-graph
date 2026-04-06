@@ -76,11 +76,91 @@
   let adx = calc.abs(dx)
   let ady = calc.abs(dy)
 
+  let normalize-segment-index(raw, n) = {
+    if type(raw) != int {
+      none
+    } else if raw > 0 and raw <= n {
+      raw
+    } else if raw == 0 {
+      n
+    } else if raw < 0 {
+      let idx = n + raw + 1
+      if idx >= 1 and idx <= n { idx } else { none }
+    } else {
+      none
+    }
+  }
+
+  let normalize-segment-length(raw) = {
+    if raw == none {
+      none
+    } else if type(raw) == int or type(raw) == float {
+      raw
+    } else {
+      none
+    }
+  }
+
+  let mode-shifts-direct-indexed = {
+    if mode-shifts == none or mode-shifts.len() < 2 {
+      false
+    } else {
+      let has-int-index = type(mode-shifts.at(0, default: none)) == int
+      let has-numeric-length = normalize-segment-length(mode-shifts.at(1, default: none)) != none
+      has-int-index and has-numeric-length
+    }
+  }
+
+  let mode-shifts-indexed-list = {
+    if mode-shifts == none or mode-shifts.len() == 0 {
+      false
+    } else {
+      let first = mode-shifts.at(0, default: none)
+      let is-pair = type(first) == array and first.len() >= 2
+      if not is-pair {
+        false
+      } else {
+        let has-int-index = type(first.at(0, default: none)) == int
+        let has-numeric-length = normalize-segment-length(first.at(1, default: none)) != none
+        has-int-index and has-numeric-length
+      }
+    }
+  }
+
+  let mode-shifts-indexed = mode-shifts-direct-indexed or mode-shifts-indexed-list
+
+  let indexed-mode-shift(i) = {
+    if not mode-shifts-indexed {
+      none
+    } else if mode-shifts-direct-indexed {
+      let idx = normalize-segment-index(mode-shifts.at(0), n)
+      let val = normalize-segment-length(mode-shifts.at(1))
+      if idx != none and idx == i { val } else { none }
+    } else {
+      let found = none
+      for j in range(mode-shifts.len()) {
+        let entry = mode-shifts.at(j)
+        if type(entry) == array and entry.len() >= 2 {
+          let idx = normalize-segment-index(entry.at(0), n)
+          let val = normalize-segment-length(entry.at(1))
+          if idx != none and idx == i and val != none {
+            found = val
+          }
+        }
+      }
+      found
+    }
+  }
+
   let seg-override(i) = {
-    if mode-shifts != none and i <= mode-shifts.len() {
-      mode-shifts.at(i - 1, default: none)
-    } else if mode-shift != none and mode-shift.len() >= 2 and mode-shift.at(0) == i {
-      mode-shift.at(1)
+    if mode-shifts-indexed {
+      indexed-mode-shift(i)
+    } else if mode-shifts != none and i <= mode-shifts.len() {
+      normalize-segment-length(mode-shifts.at(i - 1, default: none))
+    } else if mode-shift != none and mode-shift.len() >= 2 {
+      let idx = normalize-segment-index(mode-shift.at(0), n)
+      let val = normalize-segment-length(mode-shift.at(1))
+      if idx != none and idx == i { val } else { none }
     } else {
       none
     }
@@ -92,14 +172,18 @@
   let v-unk = 0
   let h-last = 0
   let v-last = 0
+  let h-last-overridden = false
+  let v-last-overridden = false
   for i in range(1, n + 1) {
     let axis = segs.at(i - 1)
     let ov = seg-override(i)
     if axis == "h" {
       h-last = i
+      h-last-overridden = ov != none
       if ov == none { h-unk += 1 } else { h-known += ov }
     } else {
       v-last = i
+      v-last-overridden = ov != none
       if ov == none { v-unk += 1 } else { v-known += ov }
     }
   }
@@ -108,8 +192,8 @@
   let v-rem = ady - v-known
   let h-each = if h-unk > 0 { h-rem / h-unk } else { 0 }
   let v-each = if v-unk > 0 { v-rem / v-unk } else { 0 }
-  let h-adjust = if h-unk == 0 { h-rem } else { 0 }
-  let v-adjust = if v-unk == 0 { v-rem } else { 0 }
+  let h-adjust = if h-unk == 0 and not h-last-overridden { h-rem } else { 0 }
+  let v-adjust = if v-unk == 0 and not v-last-overridden { v-rem } else { 0 }
 
   let seg-lens = ()
   for i in range(1, n + 1) {
@@ -239,6 +323,9 @@
   from-outer-value: none,
   to-outer: false,
   to-outer-value: none,
+  order: none,
+  out-order: none,
+  in-order: none,
 ) = {
   (
     ..route-arrow(
@@ -270,14 +357,39 @@
     mode: opts.mode,
     mode-shift: opts.mode-shift,
     mode-shifts: opts.mode-shifts,
+    order: order,
+    out-order: out-order,
+    in-order: in-order,
   )
 }
 
+/// Build an orthogonal arrow between two nodes.
+///
+/// Ordering controls:
+/// - `order`: global rank used for both source and destination endpoints.
+/// Lower values are placed first. If two endpoints share the same rank, the
+/// arrow that appears first in code is placed first.
+///
+/// Side orientation used by ordering:
+/// - `top` or `bottom`: left-to-right.
+/// - `left` or `right`: top-to-bottom.
+///
+/// Example:
+/// ```typ
+/// let arrows = (
+///   make-arrow(a, b, out-side: "bottom", order: 1, label: [first]),
+///   make-arrow(c, b, out-side: "bottom", order: 2, label: [second]),
+/// )
+/// draw-arrows(arrows)
+/// ```
 #let make-arrow(
   from,
   to,
   out-side: "right",
   in-side: "left",
+  order: none,
+  out-order: none,
+  in-order: none,
   from-outer: false,
   from-outer-value: none,
   to-outer: false,
@@ -320,9 +432,13 @@
     from-outer-value: from-outer-value,
     to-outer: to-outer,
     to-outer-value: to-outer-value,
+    order: order,
+    out-order: out-order,
+    in-order: in-order,
   )
 }
 
+/// Draw a label next to a segment from `a` to `b`.
 #let edge-label(a, b, txt, side: "above", gap: 0.22, dx: 0.0, dy: 0.0, size: 0.48em) = {
   let mx = (a.at(0) + b.at(0)) / 2 + dx
   let my = (a.at(1) + b.at(1)) / 2 + dy
@@ -332,38 +448,94 @@
   draw.content((mx + ox, my + oy), text(size: size, fill: rgb("#555555"))[#txt])
 }
 
-#let same-side-group(a, b, role: "in") = {
-  if role == "in" {
-    a.to == b.to and a.in-side == b.in-side and a.to-outer == b.to-outer and a.to-outer-value == b.to-outer-value
+#let endpoint-side(arr, role: "out") = {
+  if role == "out" { arr.out-side } else { arr.in-side }
+}
+
+#let endpoint-node(arr, role: "out") = {
+  if role == "out" { arr.from } else { arr.to }
+}
+
+#let endpoint-outer(arr, role: "out") = {
+  if role == "out" { arr.from-outer } else { arr.to-outer }
+}
+
+#let endpoint-outer-value(arr, role: "out") = {
+  if role == "out" { arr.from-outer-value } else { arr.to-outer-value }
+}
+
+#let endpoint-peer-value(arr, role: "out", axis: "x") = {
+  if role == "out" {
+    axis-value(arr.to, axis)
   } else {
-    a.from == b.from and a.out-side == b.out-side and a.from-outer == b.from-outer and a.from-outer-value == b.from-outer-value
+    axis-value(arr.from, axis)
   }
 }
 
-#let side-rank(arrows, idx, role: "in", eps: 0.0001) = {
-  let curr = arrows.at(idx)
-  let side = if role == "in" { curr.in-side } else { curr.out-side }
-  let axis = side-axis(side)
-  let curr-v = if role == "in" {
-    axis-value(curr.from, axis)
+#let endpoint-order-key(idx, role: "out") = {
+  idx * 2 + if role == "out" { 0 } else { 1 }
+}
+
+#let endpoint-order-value(arr, role: "out") = {
+  let global = if "order" in arr { arr.order } else { none }
+  if role == "out" and "out-order" in arr and arr.out-order != none {
+    arr.out-order
+  } else if role == "in" and "in-order" in arr and arr.in-order != none {
+    arr.in-order
   } else {
-    axis-value(curr.to, axis)
+    global
   }
+}
+
+#let endpoint-anchor(arr, role: "out", t: 0.5) = {
+  if role == "out" {
+    side-point(arr.from, arr.out-side, t, outer: arr.from-outer, outer-value: arr.from-outer-value)
+  } else {
+    side-point(arr.to, arr.in-side, t, outer: arr.to-outer, outer-value: arr.to-outer-value)
+  }
+}
+
+#let same-endpoint-group(a, b, role-a: "out", role-b: "out") = {
+  (
+    endpoint-node(a, role: role-a) == endpoint-node(b, role: role-b) and
+    endpoint-side(a, role: role-a) == endpoint-side(b, role: role-b) and
+    endpoint-outer(a, role: role-a) == endpoint-outer(b, role: role-b) and
+    endpoint-outer-value(a, role: role-a) == endpoint-outer-value(b, role: role-b)
+  )
+}
+
+#let endpoint-rank(arrows, idx, role: "out", eps: 0.0001) = {
+  let curr = arrows.at(idx)
+  let side = endpoint-side(curr, role: role)
+  let axis = side-axis(side)
+  let curr-v = endpoint-peer-value(curr, role: role, axis: axis)
+  let curr-order = endpoint-order-value(curr, role: role)
+  let curr-key = endpoint-order-key(idx, role: role)
 
   let n = 0
   let rank = 0
   for j in range(arrows.len()) {
     let other = arrows.at(j)
-    if same-side-group(curr, other, role: role) {
-      n += 1
-      let ov = if role == "in" {
-        axis-value(other.from, axis)
-      } else {
-        axis-value(other.to, axis)
-      }
+    for other-role in ("out", "in") {
+      if same-endpoint-group(curr, other, role-a: role, role-b: other-role) {
+        n += 1
+        let ov = endpoint-peer-value(other, role: other-role, axis: axis)
+        let oo = endpoint-order-value(other, role: other-role)
+        let ok = endpoint-order-key(j, role: other-role)
 
-      if ov < curr-v - eps or (calc.abs(ov - curr-v) <= eps and j < idx) {
-        rank += 1
+        let is-before = if oo != none and curr-order != none {
+          oo < curr-order - eps or (calc.abs(oo - curr-order) <= eps and ok < curr-key)
+        } else if oo != none {
+          true
+        } else if curr-order != none {
+          false
+        } else {
+          ov < curr-v - eps or (calc.abs(ov - curr-v) <= eps and ok < curr-key)
+        }
+
+        if is-before {
+          rank += 1
+        }
       }
     }
   }
@@ -375,20 +547,20 @@
     arr
   } else {
     let p0 = {
-      let (n, rank) = side-rank(arrows, idx, role: "out")
+      let (n, rank) = endpoint-rank(arrows, idx, role: "out")
       if n > 1 {
         let t = (rank + 1) / (n + 1)
-        side-point(arr.from, arr.out-side, t, outer: arr.from-outer, outer-value: arr.from-outer-value)
+        endpoint-anchor(arr, role: "out", t: t)
       } else {
         arr.p0
       }
     }
 
     let q0 = {
-      let (n, rank) = side-rank(arrows, idx, role: "in")
+      let (n, rank) = endpoint-rank(arrows, idx, role: "in")
       if n > 1 {
         let t = (rank + 1) / (n + 1)
-        side-point(arr.to, arr.in-side, t, outer: arr.to-outer, outer-value: arr.to-outer-value)
+        endpoint-anchor(arr, role: "in", t: t)
       } else {
         arr.q0
       }
@@ -421,6 +593,9 @@
         from-outer-value: arr.from-outer-value,
         to-outer: arr.to-outer,
         to-outer-value: arr.to-outer-value,
+        order: if "order" in arr { arr.order } else { none },
+        out-order: if "out-order" in arr { arr.out-order } else { none },
+        in-order: if "in-order" in arr { arr.in-order } else { none },
       )
     }
   }
@@ -469,14 +644,29 @@
   draw-arrow-shape(arr)
 }
 
-#let draw-arrows(arrows, auto-distribute: true) = {
-  for i in range(arrows.len()) {
-    let base = arrows.at(i)
-    let arr = if auto-distribute {
-      distribute-arrow(base, arrows, i)
-    } else {
-      base
+/// Return arrows after optional endpoint spreading.
+///
+/// Use this if you want to inspect or reuse the routed arrows before drawing.
+#let spread-arrows(arrows, auto-distribute: true) = {
+  if not auto-distribute {
+    arrows
+  } else {
+    let routed = ()
+    for i in range(arrows.len()) {
+      routed.push(distribute-arrow(arrows.at(i), arrows, i))
     }
+    routed
+  }
+}
+
+/// Draw a tuple of arrows.
+///
+/// When `auto-distribute` is true, endpoints on the same node side are spread
+/// to avoid overlap. Incoming and outgoing endpoints share one ordering pool.
+#let draw-arrows(arrows, auto-distribute: true) = {
+  let routed = spread-arrows(arrows, auto-distribute: auto-distribute)
+  for i in range(routed.len()) {
+    let arr = routed.at(i)
     draw-arrow-shape(arr)
   }
 }

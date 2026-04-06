@@ -18,25 +18,26 @@ Draw neural network graphs with CeTZ.
   let enc = make-trapezoid("Feature\nEncoder", subtitle: "Conv stack", after: ds, gap: 1.2)
   let head = make-box("Head", subtitle: "Prediction", after: enc, gap: 1.2)
 
-  draw-node(ds)
-  draw-node(enc)
-  draw-node(head)
-
+  let nodes = (ds, enc, head)
   let arrows = (
     make-arrow(ds, enc, from-outer: true, label: [input]),
     make-arrow(enc, head, label: [features]),
   )
-  draw-arrows(arrows)
+  draw-graph(nodes: nodes, arrows: arrows)
 })
 ```
 
 ## API overview
 
 - Node constructors: `make-dataset`, `make-image-dataset`, `make-image-node`, `make-latent-space`, `make-trapezoid`, `make-box`
-- Drawing: `draw-node`, `make-arrow`, `draw-arrow`, `draw-arrows`, `edge-label`
+- Drawing: `draw-node`, `draw-nodes`, `make-arrow`, `draw-arrow`, `draw-arrows`, `spread-arrows`, `draw-graph`, `edge-label`
 - Helpers: `graph-canvas`, `draw-node-emoji`
 - Defaults: `set-arrow-defaults`, `set-dataset-defaults`, `set-image-node-defaults`, `set-image-dataset-defaults`, `set-latent-space-defaults`, `set-trapezoid-defaults`, `set-box-defaults`
 - Advanced helpers: `clip-str`, `truncate-title`, `fit-lines`, `chars-cap`, `node-edge`, `node-anchor`, `auto-pos-right`, `side-dir`
+
+Arrow endpoint ordering is configurable with a single `order` value in
+`make-arrow`. Lower values are placed first. If two endpoints share the same
+order value, the one defined first in code is placed first.
 
 `make-latent-space` now defaults to a narrower width (`0.7`) so it reads more clearly as a bottleneck block.
 
@@ -120,8 +121,24 @@ You can provide target size either as `image-size: (w, h)` or as
 `make-image-dataset` now defaults to full-bleed (`image-pad: 0.0`) so the image
 fills the dataset frame exactly; increase `image-pad` only if you want an inset.
 The same fitted crop is reused on every stacked card in `make-image-dataset`.
-Tip: use `draw-arrows((...))` when several arrows share one node side; anchors
-are automatically spread evenly along that side.
+Tip: use `draw-arrows((...))` (or `draw-graph`) when several arrows touch the
+same node side; incoming and outgoing endpoints are automatically spread evenly
+along that side.
+
+Tip: use `order` when you need stable manual placement:
+
+```typ
+let arrows = (
+  // On bottom/top sides: ordering is left-to-right.
+  make-arrow(a, target, out-side: "bottom", order: 1, label: [first]),
+  make-arrow(b, target, out-side: "bottom", order: 2, label: [second]),
+
+  // On left/right sides: ordering is top-to-bottom.
+  make-arrow(c, target, in-side: "left", order: 1, label: [top]),
+  make-arrow(d, target, in-side: "left", order: 2, label: [bottom]),
+)
+draw-arrows(arrows)
+```
 
 ### Image nodes
 
