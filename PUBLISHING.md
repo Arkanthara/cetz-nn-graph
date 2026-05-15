@@ -7,7 +7,6 @@ This package targets the Typst Universe `preview` namespace.
 Run these checks before preparing a submission:
 
 ```sh
-bash scripts/bootstrap-fletcher.sh
 bash scripts/render-examples.sh
 bash scripts/render-tests.sh
 typst compile --package-path .typst/packages --root . docs/guide.typ /tmp/guide.pdf

@@ -1,4 +1,4 @@
-#import "@preview/fletcher:0.5.9" as fletcher
+#import "@preview/fletcher:0.5.8" as fletcher
 
 #let diagram = fletcher.diagram
 #let node = fletcher.node

@@ -7,7 +7,6 @@ source "$root/scripts/typst-bin.sh"
 typst_bin="$(resolve_typst_bin)"
 
 mkdir -p "$out_dir"
-"$root/scripts/bootstrap-fletcher.sh"
 "$typst_bin" compile \
   --package-path "$(typst_path "$root/.typst/packages" "$typst_bin")" \
   --root "$(typst_path "$root" "$typst_bin")" \

@@ -3,7 +3,7 @@
 
 = Unit: core specs and positioning
 
-#assert.eq(fletcher-version, "0.5.9")
+#assert.eq(fletcher-version, "0.5.8")
 #assert.eq(as-node-id("Feature Encoder"), "Feature-Encoder")
 #assert.eq(node-ref("encoder"), <encoder>)
 #assert.eq(anchor-ref("encoder", side: "right"), <encoder.east>)

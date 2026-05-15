@@ -1,5 +1,5 @@
 #let neural-viz-version = "0.2.0"
-#let fletcher-version = "0.5.9"
+#let fletcher-version = "0.5.8"
 #let default-unit = 0.72cm
 
 #let ensure-array(value) = if type(value) == array { value } else { (value,) }

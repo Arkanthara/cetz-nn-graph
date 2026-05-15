@@ -9,8 +9,6 @@ typst_bin="$(resolve_typst_bin)"
 
 mkdir -p "$out_dir"
 trap 'rm -f "$tmp"' EXIT
-"$root/scripts/bootstrap-fletcher.sh"
-
 shopt -s nullglob
 for file in "$root/examples/"*.typ; do
   name="$(basename "$file" .typ)"

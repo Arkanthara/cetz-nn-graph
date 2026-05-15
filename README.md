@@ -16,13 +16,11 @@ to Fletcher.
 #import "@preview/neural-viz:0.2.0": *
 ```
 
-The code imports Fletcher `0.5.9`. At the time this rewrite was implemented,
-Typst's public package registry still reported `0.5.8` as the latest published
-version even though Fletcher upstream `main` reports `0.5.9`. For local
-development and CI, run:
+The code imports Fletcher `0.5.8` from the Typst preview registry. If you need
+Fletcher directly in your document, you can import it explicitly:
 
-```sh
-bash scripts/bootstrap-fletcher.sh
+```typ
+#import "@preview/fletcher:0.5.8"
 ```
 
 ## Quick Start
