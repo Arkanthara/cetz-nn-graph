@@ -137,6 +137,20 @@
   ..options.named(),
 )
 
+// ─── image-node ────────────────────────────────────────────────────────────────
+//
+// New parameters:
+//   cover       (bool, default false)
+//     When true, the image fills the entire node area.  The node border and
+//     background are hidden (stroke: none, fill: none, inset: 0pt) so the raw
+//     image is the only visual element of the node itself.
+//
+//   caption-pos (string, default "bottom")
+//     Where to render the title/subtitle relative to the image when cover is
+//     true.  Accepted values: "bottom" | "top".
+//     Has no effect when cover is false.
+//
+// ───────────────────────────────────────────────────────────────────────────────
 #let image-node(
   id,
   title: auto,
@@ -147,6 +161,8 @@
   image-width: auto,
   image-height: auto,
   image-fit: "cover",
+  cover: false,
+  caption-pos: "bottom",
   unit: default-unit,
   fill: palette.image,
   stroke: rgb("#5b5130"),
@@ -154,20 +170,60 @@
 ) = {
   let title = if title == auto { id } else { title }
   let (iw, ih) = to-size(image-size, width: image-width, height: image-height, unit: unit)
-  ml-node(
-    id,
-    title: title,
-    subtitle: subtitle,
-    label: _image-label(title, subtitle: subtitle, src: src, img: img, image-width: iw, image-height: ih, image-fit: image-fit),
-    kind: "image",
-    role: "data",
-    fill: fill,
-    stroke: stroke,
-    shape: shapes.rect,
-    corner-radius: 2pt,
-    inset: 4pt,
-    ..options.named(),
-  )
+
+  if cover {
+    // Build image and optional caption as separate stack items so that the
+    // caption sits visually outside the image boundary.
+    let img-box = _image-box(src: src, img: img, width: iw, height: ih, fit: image-fit)
+
+    let caption = if title != none or subtitle != none {
+      // Pad on the side that faces the image so the gap is always between
+      // the caption text and the image, regardless of caption position.
+      let caption-pad = if caption-pos == "top" { (bottom: 2pt) } else { (top: 2pt) }
+      pad(..caption-pad)[
+        #_text-block(title, subtitle: subtitle, title-size: 0.78em, subtitle-size: 0.64em)
+      ]
+    }
+
+    let lbl = if caption == none {
+      img-box
+    } else if caption-pos == "top" {
+      stack(dir: ttb, spacing: 0pt, caption, img-box)
+    } else {
+      stack(dir: ttb, spacing: 0pt, img-box, caption)
+    }
+
+    ml-node(
+      id,
+      title: title,
+      subtitle: subtitle,
+      label: lbl,
+      kind: "image",
+      role: "data",
+      // No fill and no stroke: the image box itself is the only visual.
+      fill: none,
+      stroke: none,
+      shape: shapes.rect,
+      corner-radius: 0pt,
+      inset: 0pt,
+      ..options.named(),
+    )
+  } else {
+    ml-node(
+      id,
+      title: title,
+      subtitle: subtitle,
+      label: _image-label(title, subtitle: subtitle, src: src, img: img, image-width: iw, image-height: ih, image-fit: image-fit),
+      kind: "image",
+      role: "data",
+      fill: fill,
+      stroke: stroke,
+      shape: shapes.rect,
+      corner-radius: 2pt,
+      inset: 4pt,
+      ..options.named(),
+    )
+  }
 }
 
 #let image-dataset(id, title: auto, subtitle: none, stack: 3, ..options) = {
@@ -180,6 +236,42 @@
   n.kind = "image-dataset"
   n.extrude = if stack <= 1 { (0,) } else { range(stack).map(i => i * 2) }
   n
+}
+
+// ─── text-node ─────────────────────────────────────────────────────────────────
+// A borderless, background-free node for inline text or mathematical formulas.
+//
+// Usage:
+//   #text-node("t1", $bold(z) = f(bold(x))$)
+//   #text-node("t2", [… or any Typst content …])
+//
+// Parameters:
+//   body        – any Typst content (text, math, markup)
+//   size        – font size of the body (default 1em)
+//   color       – text/math color (default black)
+// ───────────────────────────────────────────────────────────────────────────────
+#let text-node(
+  id,
+  body,
+  size: 1em,
+  color: black,
+  node-size: auto,
+  unit: default-unit,
+  ..options,
+) = {
+  let resolved-size = if node-size == auto { auto } else { to-size(node-size, unit: unit) }
+  ml-node(
+    id,
+    label: align(center, text(size: size, fill: color)[#body]),
+    kind: "text",
+    role: "annotation",
+    fill: none,
+    stroke: none,
+    inset: 2pt,
+    corner-radius: 0pt,
+    size: resolved-size,
+    ..options.named(),
+  )
 }
 
 #let module(
@@ -291,6 +383,164 @@
   shape: shapes.diamond,
   ..options.named(),
 )
+
+// ─── arrow-node ─────────────────────────────────────────────────────────────
+//
+// A node displayed as a directional arrow, with a label that can sit inside
+// the arrow or above/below it.
+//
+// Parameters
+// ──────────
+//   dir         Direction the arrow points.
+//               Accepts Typst cardinal values: right, left, top, bottom.
+//
+//   shape       Arrow visual style:
+//                 "arrow"    (default) — classic 7-point notched arrow with tail
+//                 "chevron"  — 6-point pentagon arrow, no tail
+//                 "triangle" — simple 3-point triangle
+//               When label-pos is "inside", you may instead pass a Fletcher
+//               shape function directly (e.g. shapes.chevron.with(dir: right)).
+//
+//   label-pos   Where to render the title relative to the arrow visual:
+//                 "inside" — text rendered inside the Fletcher node shape
+//                 "above"  — arrow drawn as a polygon; label floats above
+//                 "below"  — arrow drawn as a polygon; label floats below
+//               Default: "below"
+//
+//   size        (width, height) of the arrow visual expressed in `unit`.
+//               Default: (2.6, 1.1)
+//
+//   fill        Fill colour of the arrow.
+//   stroke      Border colour of the arrow.
+//
+// Examples
+// ────────
+//   #arrow-node("fwd",  dir: right,  shape: "arrow",   label-pos: "below")
+//   #arrow-node("up",   dir: top,    shape: "chevron",  label-pos: "above")
+//   #arrow-node("tri",  dir: bottom, shape: "triangle", label-pos: "inside")
+//
+// ─────────────────────────────────────────────────────────────────────────────
+#let arrow-node(
+  id,
+  title:     auto,
+  subtitle:  none,
+  dir:       right,
+  shape:     "arrow",
+  label-pos: "below",
+  size:      (2.6, 1.1),
+  fill:      palette.operation,
+  stroke:    rgb("#7a5030"),
+  unit:      default-unit,
+  ..options,
+) = {
+  let title  = if title == auto { id } else { title }
+  let (w, h) = to-size(size, unit: unit)
+  let sk     = (paint: stroke, thickness: 0.6pt, join: "miter")
+
+  // ── polygon point-sets ─────────────────────────────────────────────────────
+  // All coordinates are absolute lengths derived from (w, h).
+  let _pts(dir, kind) = {
+    if kind == "triangle" {
+      if      dir == right  { ((0pt, 0pt),  (w,  h/2), (0pt, h  )) }
+      else if dir == left   { ((w,   0pt),  (0pt, h/2), (w,  h  )) }
+      else if dir == bottom { ((0pt, 0pt),  (w,  0pt), (w/2, h  )) }
+      else                  { ((0pt, h  ),  (w,  h  ), (w/2, 0pt)) }  // top
+
+    } else if kind == "chevron" {
+      // 6-point arrow, no rectangular tail
+      let t = 0.35
+      if      dir == right  {
+        ((0pt,    0pt),   (w*(1-t), 0pt),   (w,     h/2),
+         (w*(1-t), h),   (0pt,      h),     (w*t,   h/2))
+      } else if dir == left {
+        ((w,      0pt),   (w*t,    0pt),    (0pt,   h/2),
+         (w*t,    h),    (w,       h),      (w*(1-t), h/2))
+      } else if dir == bottom {
+        ((0pt,    0pt),   (w,      0pt),    (w,     h*(1-t)),
+         (w/2,   h),     (0pt,    h*(1-t)))
+      } else {                                                         // top
+        ((0pt,   h),     (w,      h),      (w,     h*t),
+         (w/2,  0pt),    (0pt,   h*t))
+      }
+
+    } else {
+      // "arrow" – classic 7-point notched arrow with a rectangular tail
+      if      dir == right  {
+        let ny = h * 0.22; let tx = w * 0.60
+        ((0pt, ny), (tx, ny), (tx, 0pt), (w, h/2), (tx, h), (tx, h - ny), (0pt, h - ny))
+      } else if dir == left {
+        let ny = h * 0.22; let tx = w * 0.40
+        ((w, ny), (tx, ny), (tx, 0pt), (0pt, h/2), (tx, h), (tx, h - ny), (w, h - ny))
+      } else if dir == bottom {
+        let nx = w * 0.22; let ty = h * 0.60
+        ((nx, 0pt), (w - nx, 0pt), (w - nx, ty), (w, ty), (w/2, h), (0pt, ty), (nx, ty))
+      } else {                                                         // top
+        let nx = w * 0.22; let ty = h * 0.40
+        ((nx, h), (w - nx, h), (w - nx, ty), (w, ty), (w/2, 0pt), (0pt, ty), (nx, ty))
+      }
+    }
+  }
+
+  if label-pos == "inside" {
+    // ── Fletcher node: text label rendered inside the arrow outline ──────────
+    // If the caller provided a raw string shape name, map to the closest
+    // Fletcher built-in (shapes.chevron honours the `dir` parameter and is
+    // the best universal match). If the caller passed a Fletcher shape
+    // function directly, use it as-is.
+    let node-shape = if type(shape) == str {
+      shapes.chevron.with(dir: dir)
+    } else {
+      shape
+    }
+    ml-node(
+      id,
+      title:         title,
+      subtitle:      subtitle,
+      label:         _text-block(title, subtitle: subtitle),
+      kind:          "arrow",
+      role:          "operation",
+      fill:          fill,
+      stroke:        stroke,
+      shape:         node-shape,
+      size:          size,
+      unit:          unit,
+      corner-radius: 2pt,
+      ..options.named(),
+    )
+
+  } else {
+    // ── Drawn-polygon mode: arrow visual + caption stacked ───────────────────
+    // The ml-node acts as an invisible container (no fill, no stroke) so that
+    // the hand-drawn polygon is the only visible element.
+    let kind = if type(shape) == str { shape } else { "arrow" }
+    let arrow-box = box(width: w, height: h)[
+      #polygon(fill: fill, stroke: sk, .._pts(dir, kind))
+    ]
+    let caption = pad(top: 1pt, bottom: 1pt)[
+      #_text-block(title, subtitle: subtitle, title-size: 0.78em, subtitle-size: 0.64em)
+    ]
+    let lbl = if label-pos == "above" {
+      stack(dir: ttb, spacing: 4pt, caption, arrow-box)
+    } else {
+      stack(dir: ttb, spacing: 4pt, arrow-box, caption)
+    }
+    ml-node(
+      id,
+      title:         title,
+      subtitle:      subtitle,
+      label:         lbl,
+      kind:          "arrow",
+      role:          "operation",
+      fill:          none,
+      stroke:        none,
+      shape:         shapes.rect,
+      corner-radius: 0pt,
+      inset:         0pt,
+      unit:          unit,
+      ..options.named(),
+    )
+  }
+}
 
 #let group(
   id,
