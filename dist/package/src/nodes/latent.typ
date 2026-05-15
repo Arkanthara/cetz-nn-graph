@@ -1,6 +1,6 @@
 #import "dataset.typ": make-dataset
 
-#let make-latent-space(
+#let make-rectangle(
   title,
   subtitle: none,
   legend: none,
@@ -43,3 +43,5 @@
     wrap-lines: wrap-lines,
   )
 }
+
+#let make-latent-space = make-rectangle

@@ -21,6 +21,7 @@
   subtitle-size: 0.54em,
   legend-size: 0.48em,
   wrap-lines: 2,
+  title-position: "inside",
 ) = {
   let (cx, cy) = resolve-node-center(pos, after, width, gap: gap, y: y, default-x: 4.5)
 
@@ -46,5 +47,6 @@
     subtitle-size: subtitle-size,
     legend-size: legend-size,
     wrap-lines: wrap-lines,
+    title-position: title-position,
   )
 }

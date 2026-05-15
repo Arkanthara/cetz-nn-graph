@@ -11,12 +11,32 @@
   let s = fit-lines(node.subtitle, max-chars: max-chars, max-lines: node.wrap-lines)
   let g = fit-lines(node.legend, max-chars: chars-cap(nw + 0.6), max-lines: node.wrap-lines)
 
+  let title-pos = if "title-position" in node { node.title-position } else { "inside" }
+  let title-italic = node.kind == "trapezoid" or node.kind == "box"
+  let title-body = if title-italic { [*#t*] } else { [#t] }
+
   let draw-inner-text(x, y) = {
     if node.subtitle == none {
-      content((x, y), align(center)[#text(size: node.title-size)[#t]])
+      content((x, y), align(center)[#text(size: node.title-size)[#title-body]])
     } else {
-      content((x, y + 0.26), align(center)[#text(size: node.title-size)[#t]])
+      content((x, y + 0.26), align(center)[#text(size: node.title-size)[#title-body]])
       content((x, y - 0.36), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
+    }
+  }
+
+  let draw-title-block(x, y) = {
+    if title-pos == "below" {
+      content((x, y - nh / 2 - 0.55), align(center)[#text(size: node.title-size)[#title-body]])
+      if node.subtitle != none {
+        content((x, y - nh / 2 - 0.95), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
+      }
+    } else if title-pos == "above" {
+      content((x, y + nh / 2 + 0.55), align(center)[#text(size: node.title-size)[#title-body]])
+      if node.subtitle != none {
+        content((x, y + nh / 2 + 0.95), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
+      }
+    } else {
+      draw-inner-text(x, y)
     }
   }
 
@@ -44,6 +64,11 @@
   }
 
   if node.kind == "stack" {
+    let stroke-style = if "border" in node and node.border == false {
+      none
+    } else {
+      (paint: black, thickness: 0.5pt)
+    }
     for i in range(node.n) {
       let j = node.n - 1 - i
       let off = j * node.shift
@@ -53,38 +78,41 @@
         (x - node.w / 2, y - node.h / 2),
         (x + node.w / 2, y + node.h / 2),
         fill: node.color,
-        stroke: (paint: black, thickness: 0.5pt),
+        stroke: stroke-style,
       )
 
       // For image datasets, draw the same fitted image on each stack layer.
       draw-image(x, y)
     }
 
-    if node.title-position == "below" {
-      content((node.cx, node.cy - node.h / 2 - 0.55), align(center)[#text(size: node.title-size)[#t]])
-      if node.subtitle != none {
-        content((node.cx, node.cy - node.h / 2 - 0.95), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
-      }
-    } else {
-      draw-inner-text(node.cx, node.cy)
-    }
+    draw-title-block(node.cx, node.cy)
     draw-legend(node.cx, node.cy)
   } else if node.kind == "image" {
+    let stroke-style = if "border" in node and node.border == false {
+      none
+    } else {
+      (paint: black, thickness: 0.65pt)
+    }
     rect(
       (node.cx - node.w / 2, node.cy - node.h / 2),
       (node.cx + node.w / 2, node.cy + node.h / 2),
       fill: node.color,
-      stroke: (paint: black, thickness: 0.65pt),
+      stroke: stroke-style,
     )
     draw-image(node.cx, node.cy)
-    if node.title-position == "below" {
-      content((node.cx, node.cy - node.h / 2 - 0.55), align(center)[#text(size: node.title-size)[#t]])
-      if node.subtitle != none {
-        content((node.cx, node.cy - node.h / 2 - 0.95), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
-      }
-    } else {
-      draw-inner-text(node.cx, node.cy)
-    }
+    draw-title-block(node.cx, node.cy)
+    draw-legend(node.cx, node.cy)
+  } else if node.kind == "text" {
+    draw-title-block(node.cx, node.cy)
+    draw-legend(node.cx, node.cy)
+  } else if node.kind == "circle" {
+    circle(
+      (node.cx, node.cy),
+      radius: node.w / 2,
+      fill: node.color,
+      stroke: (paint: black, thickness: 0.65pt),
+    )
+    draw-title-block(node.cx, node.cy)
     draw-legend(node.cx, node.cy)
   } else if node.kind == "trapezoid" {
     let lx = node.cx - node.w / 2
@@ -96,12 +124,7 @@
       fill: node.color,
       stroke: (paint: black, thickness: 0.65pt),
     )
-    if node.subtitle == none {
-      content((node.cx, node.cy), align(center)[#text(size: node.title-size)[*#t*]])
-    } else {
-      content((node.cx, node.cy + 0.26), align(center)[#text(size: node.title-size)[*#t*]])
-      content((node.cx, node.cy - 0.36), align(center)[#text(size: node.subtitle-size, fill: rgb("#333333"))[#s]])
-    }
+    draw-title-block(node.cx, node.cy)
     draw-legend(node.cx, node.cy)
   } else {
     rect(
@@ -110,12 +133,7 @@
       fill: node.color,
       stroke: (paint: black, thickness: 0.65pt),
     )
-    if node.subtitle == none {
-      content((node.cx, node.cy), align(center)[#text(size: node.title-size)[*#t*]])
-    } else {
-      content((node.cx, node.cy + 0.26), align(center)[#text(size: node.title-size)[*#t*]])
-      content((node.cx, node.cy - 0.36), align(center)[#text(size: node.subtitle-size)[#s]])
-    }
+    draw-title-block(node.cx, node.cy)
     draw-legend(node.cx, node.cy)
   }
 }

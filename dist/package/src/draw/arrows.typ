@@ -30,6 +30,73 @@
   }
 }
 
+#let sign-num(v) = {
+  if v > 0 { 1 } else if v < 0 { -1 } else { 0 }
+}
+
+#let rounded-points(points, radius, steps: 4) = {
+  if radius == none {
+    points
+  } else if not (type(radius) == int or type(radius) == float) {
+    points
+  } else if radius <= 0 or points.len() < 3 {
+    points
+  } else {
+    let out = (points.first(),)
+    for i in range(1, points.len() - 1) {
+      let prev = points.at(i - 1)
+      let curr = points.at(i)
+      let next = points.at(i + 1)
+
+      let dx1 = curr.at(0) - prev.at(0)
+      let dy1 = curr.at(1) - prev.at(1)
+      let dx2 = next.at(0) - curr.at(0)
+      let dy2 = next.at(1) - curr.at(1)
+
+      let axis1 = if calc.abs(dx1) > calc.abs(dy1) { "x" } else { "y" }
+      let axis2 = if calc.abs(dx2) > calc.abs(dy2) { "x" } else { "y" }
+
+      if (dx1 == 0 and dy1 == 0) or (dx2 == 0 and dy2 == 0) or axis1 == axis2 {
+        out.push(curr)
+      } else {
+        let len1 = if axis1 == "x" { calc.abs(dx1) } else { calc.abs(dy1) }
+        let len2 = if axis2 == "x" { calc.abs(dx2) } else { calc.abs(dy2) }
+        let rr = calc.min(radius, len1 / 2, len2 / 2)
+
+        if rr <= 0 {
+          out.push(curr)
+        } else {
+          let sx1 = sign-num(dx1)
+          let sy1 = sign-num(dy1)
+          let sx2 = sign-num(dx2)
+          let sy2 = sign-num(dy2)
+
+          let pin = (curr.at(0) - sx1 * rr, curr.at(1) - sy1 * rr)
+          let pout = (curr.at(0) + sx2 * rr, curr.at(1) + sy2 * rr)
+          let cx = curr.at(0) - sx1 * rr + sx2 * rr
+          let cy = curr.at(1) - sy1 * rr + sy2 * rr
+
+          let a0 = calc.atan2(pin.at(1) - cy, pin.at(0) - cx)
+          let a1 = calc.atan2(pout.at(1) - cy, pout.at(0) - cx)
+          let turn = sx1 * sy2 - sy1 * sx2
+          let delta = a1 - a0
+          if turn > 0 and delta < 0deg { delta += 360deg }
+          if turn < 0 and delta > 0deg { delta -= 360deg }
+
+          out.push(pin)
+          for k in range(1, steps) {
+            let a = a0 + delta * (k / steps)
+            out.push((cx + rr * calc.cos(a), cy + rr * calc.sin(a)))
+          }
+          out.push(pout)
+        }
+      }
+    }
+    out.push(points.last())
+    out
+  }
+}
+
 #let route-arrow(
   p0,
   q0,
@@ -293,6 +360,7 @@
   mode: "hv",
   mode-shift: none,
   mode-shifts: none,
+  corner-radius: none,
   label: none,
   label-side: "above",
   label-gap: 0.30,
@@ -306,6 +374,7 @@
   mode: mode,
   mode-shift: mode-shift,
   mode-shifts: mode-shifts,
+  corner-radius: corner-radius,
   label: label,
   label-side: label-side,
   label-gap: label-gap,
@@ -354,6 +423,7 @@
     mode: opts.mode,
     mode-shift: opts.mode-shift,
     mode-shifts: opts.mode-shifts,
+    corner-radius: opts.corner-radius,
   )
 }
 
@@ -371,12 +441,15 @@
   mode: "hv",
   mode-shift: none,
   mode-shifts: none,
+  corner-radius: none,
+  radius: none,
   label: none,
   label-side: "above",
   label-gap: 0.30,
   label-dx: 0.0,
   label-dy: 0.0,
 ) = {
+  let corner-radius = if corner-radius != none { corner-radius } else { radius }
   let opts = route-options(
     out-side: out-side,
     in-side: in-side,
@@ -385,6 +458,7 @@
     mode: mode,
     mode-shift: mode-shift,
     mode-shifts: mode-shifts,
+    corner-radius: corner-radius,
     label: label,
     label-side: label-side,
     label-gap: label-gap,
@@ -489,6 +563,7 @@
         mode: arr.mode,
         mode-shift: arr.mode-shift,
         mode-shifts: arr.mode-shifts,
+        corner-radius: if "corner-radius" in arr { arr.corner-radius } else { none },
         label: arr.label,
         label-side: arr.label-side,
         label-gap: arr.label-gap,
@@ -513,17 +588,17 @@
 #let draw-arrow-shape(arr) = {
   import draw: *
 
-  if "points" in arr and arr.points.len() >= 2 {
-    line(..arr.points,
-      mark: (end: ">"),
-      stroke: (paint: black, thickness: 0.75pt),
-    )
+  let radius = if "corner-radius" in arr { arr.corner-radius } else { none }
+  let points = if "points" in arr and arr.points.len() >= 2 {
+    rounded-points(arr.points, radius)
   } else {
-    line(arr.p0, arr.q0,
-      mark: (end: ">"),
-      stroke: (paint: black, thickness: 0.75pt),
-    )
+    rounded-points((arr.p0, arr.q0), radius)
   }
+
+  line(..points,
+    mark: (end: ">"),
+    stroke: (paint: black, thickness: 0.75pt),
+  )
 
   if arr.label != none {
     let a = if "label-a" in arr {

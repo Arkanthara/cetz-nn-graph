@@ -1,9 +1,9 @@
 #import "dataset.typ": make-dataset
 
-/// Build a latent-space block.
+/// Build a narrow rectangle block.
 ///
 /// This is a thin dataset convenience wrapper with one stacked card.
-#let make-latent-space(
+#let make-rectangle(
   title,
   subtitle: none,
   legend: none,
@@ -46,3 +46,6 @@
     wrap-lines: wrap-lines,
   )
 }
+
+/// Backwards-compatible alias for make-rectangle.
+#let make-latent-space = make-rectangle

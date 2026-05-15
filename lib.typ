@@ -4,10 +4,13 @@
 #import "src/helpers/graph.typ": draw-graph
 #import "src/nodes/dataset.typ": make-dataset
 #import "src/nodes/image.typ": make-image-node, make-image-dataset
-#import "src/nodes/latent.typ": make-latent-space
+#import "src/nodes/latent.typ": make-latent-space, make-rectangle
 #import "src/nodes/trapezoid.typ": make-trapezoid
 #import "src/nodes/box.typ": make-box
+#import "src/nodes/square.typ": make-square
+#import "src/nodes/circle.typ": make-circle
+#import "src/nodes/text.typ": make-text
 #import "src/draw/nodes.typ": draw-node, draw-nodes
 #import "src/draw/arrows.typ": make-arrow, draw-arrow, draw-arrows, spread-arrows, edge-label
 #import "src/draw/emoji.typ": draw-node-emoji
-#import "src/defaults.typ": set-arrow-defaults, set-dataset-defaults, set-image-node-defaults, set-image-dataset-defaults, set-latent-space-defaults, set-trapezoid-defaults, set-box-defaults
+#import "src/defaults.typ": set-arrow-defaults, set-dataset-defaults, set-image-node-defaults, set-image-dataset-defaults, set-latent-space-defaults, set-rectangle-defaults, set-trapezoid-defaults, set-box-defaults, set-square-defaults, set-circle-defaults, set-text-defaults

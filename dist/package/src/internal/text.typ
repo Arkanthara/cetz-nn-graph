@@ -13,6 +13,9 @@
 #let truncate-title(txt, enabled: true, max-chars: 18) = {
   if txt == none {
     none
+  } else if type(txt) != str {
+    // Non-string content (e.g., math) cannot be truncated safely.
+    txt
   } else {
     let chars = txt.clusters()
     if not enabled or chars.len() <= max-chars {
