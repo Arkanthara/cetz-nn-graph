@@ -1,31 +1,18 @@
 #import "../lib.typ": *
 
-#graph-canvas({
-  let ds = make-dataset("Training\nImages", pos: (1.0, 0.0))
-  let enc = make-trapezoid("Feature\nEncoder", subtitle: "Conv stack", after: ds, gap: 1.2)
-  let feat = make-dataset(
-    "Feature\nTensor",
-    images: 5,
-    image-size: (1.1, 1.5),
-    image-spacing: 0.1,
-    title-position: "below",
-    after: enc,
-    gap: 1.2,
-  )
-  let cls = make-box("Classifier", subtitle: "MLP", after: feat, gap: 1.2)
-  let out = make-box("Class\nScores", after: cls, gap: 1.0)
+#let nodes = (
+  dataset("train", title: [Training images]),
+  encoder("encoder", title: [Feature encoder], subtitle: [Conv stack]),
+  tensor("features", title: [Feature tensor], dims: [$B times C times H times W$]),
+  module("classifier", title: [Classifier], subtitle: [MLP]),
+  io-node("scores", title: [Class scores]),
+)
 
-  draw-node(ds)
-  draw-node(enc)
-  draw-node(feat)
-  draw-node(cls)
-  draw-node(out)
+#let edges = (
+  ml-edge("train", "encoder", label: [input]),
+  ml-edge("encoder", "features", label: [features]),
+  ml-edge("features", "classifier", label: [flatten]),
+  ml-edge("classifier", "scores", label: [logits]),
+)
 
-  let arrows = (
-    make-arrow(ds, enc, from-outer: true, label: [input]),
-    make-arrow(enc, feat, label: [features]),
-    make-arrow(feat, cls, from-outer: true, label: [flatten]),
-    make-arrow(cls, out, label: [logits]),
-  )
-  draw-arrows(arrows)
-})
+#ml-diagram(nodes, edges: edges, layout: "pipeline")

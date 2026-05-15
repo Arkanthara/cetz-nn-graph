@@ -1,17 +1,14 @@
 #import "../lib.typ": *
 
-#graph-canvas({
-  let ds = make-dataset("Image\nDataset", pos: (1.0, 0.0))
-  let enc = make-trapezoid("Feature\nEncoder", subtitle: "Conv stack", after: ds, gap: 1.2)
-  let head = make-box("Head", subtitle: "Prediction", after: enc, gap: 1.2)
+#let nodes = (
+  dataset("images", title: [Image dataset]),
+  encoder("encoder", title: [Feature encoder], subtitle: [Conv stack]),
+  module("head", title: [Head], subtitle: [Prediction]),
+)
 
-  draw-node(ds)
-  draw-node(enc)
-  draw-node(head)
+#let edges = (
+  ml-edge("images", "encoder", label: [input]),
+  ml-edge("encoder", "head", label: [features]),
+)
 
-  let arrows = (
-    make-arrow(ds, enc, from-outer: true, label: [input]),
-    make-arrow(enc, head, label: [features]),
-  )
-  draw-arrows(arrows)
-})
+#ml-diagram(nodes, edges: edges, layout: "pipeline")

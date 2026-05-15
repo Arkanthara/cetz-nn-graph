@@ -1,26 +1,20 @@
 #import "../lib.typ": *
 
-#graph-canvas({
-  let real = make-dataset("Real\nImages", pos: (1.0, 1.6))
-  let noise = make-box("Noise z", pos: (1.0, -1.6))
-  let gen = make-box("Generator", after: noise, gap: 1.2)
-  let fake = make-dataset("Fake\nImages", after: gen, gap: 1.2)
-  let disc = make-box("Discriminator", after: fake, gap: 1.4, y: 0.0)
-  let out = make-box("Score", after: disc, gap: 1.0)
+#let nodes = (
+  image-dataset("real", title: [Real images], src: "/assets/test.jpg", pos: (0, -1.2)),
+  vector("noise", title: [Noise z], pos: (0, 1.2)),
+  decoder("generator", title: [Generator], pos: right-of("noise")),
+  image-dataset("fake", title: [Fake images], src: "/assets/test.jpg", pos: right-of("generator")),
+  encoder("discriminator", title: [Discriminator], pos: (3, 0)),
+  io-node("score", title: [Score], pos: right-of("discriminator")),
+)
 
-  draw-node(real)
-  draw-node(noise)
-  draw-node(gen)
-  draw-node(fake)
-  draw-node(disc)
-  draw-node(out)
+#let edges = (
+  ml-edge("noise", "generator", label: [noise]),
+  ml-edge("generator", "fake", label: [fake]),
+  ml-edge("fake", "discriminator", label: [fake]),
+  ml-edge("real", "discriminator", from-side: "right", to-side: "top", label: [real]),
+  ml-edge("discriminator", "score", label: [score]),
+)
 
-  let arrows = (
-    make-arrow(noise, gen, label: [noise]),
-    make-arrow(gen, fake, from-outer: true, label: [fake]),
-    make-arrow(fake, disc, from-outer: true, label: [fake]),
-    make-arrow(real, disc, out-side: "right", in-side: "top", from-outer: true, mode: "hv", label: [real]),
-    make-arrow(disc, out, label: [score]),
-  )
-  draw-arrows(arrows)
-})
+#ml-diagram(nodes, edges: edges, layout: false)

@@ -1,46 +1,25 @@
 #import "../lib.typ": *
 
-#graph-canvas({
-  let img = make-image-node(
-    "Single\nImage",
+#let nodes = (
+  image-node(
+    "image",
+    title: [Single image],
     src: "/assets/test.jpg",
-    image-width: 2.1,
-    image-height: 2.1,
-    image-pad: 0.08,
-    image-shift-x: 0.18,
-    image-shift-y: -0.12,
-    unit: 0.72cm,
-    pos: (1.0, 0.0),
-    title-position: "below",
-  )
-  let ds = make-image-dataset(
-    "Image\nDataset",
+    image-size: (2.1, 1.8),
+  ),
+  image-dataset(
+    "dataset",
+    title: [Image dataset],
     src: "/assets/test.jpg",
-    images: 4,
-    image-width: 1.5,
-    image-height: 2.0,
-    image-spacing: 0.16,
-    image-shift-x: -0.22,
-    image-shift-y: 0.08,
-    unit: 0.72cm,
-    title-position: "below",
-    after: img,
-    gap: 1.4,
-  )
-  let latent = make-latent-space(
-    "Latent\nSpace",
-    height: 3.0,
-    after: ds,
-    gap: 1.4,
-  )
+    stack: 4,
+    image-size: (1.5, 1.9),
+  ),
+  tensor("latent", title: [Latent space], stack: 1, size: (0.85, 2.6)),
+)
 
-  draw-node(img)
-  draw-node(ds)
-  draw-node(latent)
+#let edges = (
+  ml-edge("image", "dataset", label: [samples]),
+  ml-edge("dataset", "latent", label: [encode]),
+)
 
-  let arrows = (
-    make-arrow(img, ds, label: [samples]),
-    make-arrow(ds, latent, label: [encode]),
-  )
-  draw-arrows(arrows)
-})
+#ml-diagram(nodes, edges: edges, layout: "pipeline")

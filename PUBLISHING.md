@@ -7,9 +7,10 @@ This package targets the Typst Universe `preview` namespace.
 Run these checks before preparing a submission:
 
 ```sh
+bash scripts/bootstrap-fletcher.sh
 bash scripts/render-examples.sh
 bash scripts/render-tests.sh
-typst compile --root . docs/guide.typ /tmp/guide.pdf
+typst compile --package-path .typst/packages --root . docs/guide.typ /tmp/guide.pdf
 bash scripts/prepare-package.sh
 ```
 
@@ -34,8 +35,8 @@ git checkout main
 Create the target directory and copy files:
 
 ```sh
-mkdir -p packages/preview/neural-viz/0.1.0
-cp -R /path/to/neural-viz/dist/package/. packages/preview/neural-viz/0.1.0/
+mkdir -p packages/preview/neural-viz/0.2.0
+cp -R /path/to/neural-viz/dist/package/. packages/preview/neural-viz/0.2.0/
 ```
 
 ## 4. Commit/exclude model used here
@@ -45,8 +46,8 @@ cp -R /path/to/neural-viz/dist/package/. packages/preview/neural-viz/0.1.0/
 - Required runtime files: `typst.toml`, `lib.typ`, `src/`, `README.md`, `LICENSE`
 - Documentation/support files referenced by docs and README: `docs/`, `assets/`
 
-The manifest `exclude` patterns keep docs/assets out of the downloaded archive while
-still allowing Typst Universe to render linked documentation resources.
+The manifest excludes development fixtures (`examples`, `scripts`, `tests`,
+`.github`, `.typst`, and `dist`). Documentation stays in the prepared package.
 
 ## 5. Final reminders
 

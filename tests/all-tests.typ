@@ -1,20 +1,20 @@
 = Test report
 
-This report aggregates all test suites in one PDF.
+This report aggregates assertion suites and visual smoke diagrams.
 
-#include "string-utils.typ"
+#include "unit-core.typ"
 #pagebreak()
 
-#include "geometry.typ"
+#include "unit-layout.typ"
 #pagebreak()
 
-#include "nodes.typ"
+#include "unit-nodes.typ"
 #pagebreak()
 
-#include "arrows.typ"
+#include "unit-render.typ"
 #pagebreak()
 
-#include "defaults.typ"
+#include "integration.typ"
 #pagebreak()
 
-#include "emoji-defaults.typ"
+#include "visual-regression.typ"

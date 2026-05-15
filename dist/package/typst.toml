@@ -1,9 +1,9 @@
 [package]
 name = "neural-viz"
-version = "0.1.0"
+version = "0.2.0"
 entrypoint = "lib.typ"
 authors = ["Michel Jean Joseph Donnet"]
 license = "MIT"
-description = "Draw neural network graphs with CeTZ."
-keywords = ["neural-network", "diagram", "graph", "cetz", "machine-learning"]
-exclude = ["docs/**", "examples/**", "scripts/**", "tests/**", "assets/**", ".github/**", "dist/**"]
+description = "Draw machine-learning diagrams with Fletcher."
+keywords = ["machine-learning", "diagram", "graph", "fletcher", "neural-network"]
+exclude = ["examples/**", "scripts/**", "tests/**", "assets/**", ".github/**", ".typst/**", "dist/**"]

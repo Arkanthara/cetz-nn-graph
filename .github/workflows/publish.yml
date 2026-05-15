@@ -12,6 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: typst-community/setup-typst@v1
+      - run: bash scripts/bootstrap-fletcher.sh
+      - run: bash scripts/render-tests.sh
       - run: bash scripts/render-examples.sh
       - run: bash scripts/prepare-package.sh
       - uses: actions/upload-artifact@v4

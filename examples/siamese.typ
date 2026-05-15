@@ -1,34 +1,21 @@
 #import "../lib.typ": *
 
-#graph-canvas({
-  let a = make-dataset("Input A", pos: (1.0, 1.4))
-  let b = make-dataset("Input B", pos: (1.0, -1.4))
-  let enc-a = make-box("Shared\nEncoder", after: a, gap: 1.2)
-  let enc-b = make-box("Shared\nEncoder", after: b, gap: 1.2)
-  let emb = make-dataset(
-    "Embedding",
-    images: 2,
-    image-size: (1.2, 1.5),
-    title-position: "below",
-    after: enc-a,
-    gap: 1.6,
-    y: 0.0,
-  )
-  let cmp = make-box("Distance", after: emb, gap: 1.2)
+#let nodes = (
+  dataset("a", title: [Input A], pos: (0, -1)),
+  dataset("b", title: [Input B], pos: (0, 1)),
+  encoder("enc-a", title: [Shared encoder], pos: right-of("a")),
+  encoder("enc-b", title: [Shared encoder], pos: right-of("b")),
+  embedding("embedding", title: [Embedding], pos: (2, 0)),
+  module("distance", title: [Distance], pos: right-of("embedding")),
+  group("shared", ("enc-a", "enc-b"), title: [Shared weights]),
+)
 
-  draw-node(a)
-  draw-node(b)
-  draw-node(enc-a)
-  draw-node(enc-b)
-  draw-node(emb)
-  draw-node(cmp)
+#let edges = (
+  ml-edge("a", "enc-a", label: [input]),
+  ml-edge("b", "enc-b", label: [input]),
+  ml-edge("enc-a", "embedding", label: [embed]),
+  ml-edge("enc-b", "embedding", label: [embed]),
+  ml-edge("embedding", "distance", label: [compare]),
+)
 
-  let arrows = (
-    make-arrow(a, enc-a, from-outer: true, label: [input]),
-    make-arrow(b, enc-b, from-outer: true, label: [input]),
-    make-arrow(enc-a, emb, in-side: "left", label: [embed]),
-    make-arrow(enc-b, emb, in-side: "left", label: [embed]),
-    make-arrow(emb, cmp, from-outer: true, label: [compare]),
-  )
-  draw-arrows(arrows)
-})
+#ml-diagram(nodes, edges: edges, layout: false)
