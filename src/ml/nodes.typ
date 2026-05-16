@@ -3,20 +3,36 @@
 #import "../core/utils.typ": default-unit, to-length, to-size, ensure-array, as-node-id
 #import "../core/position.typ": node-ref
 
+// ─── Palette ──────────────────────────────────────────────────────────────────
+
 #let palette = (
-  data: rgb("#d7ecff"),
-  image: rgb("#fff7d6"),
-  tensor: rgb("#e5f4df"),
-  module: rgb("#e8e4ff"),
+  data:      rgb("#d7ecff"),
+  image:     rgb("#fff7d6"),
+  tensor:    rgb("#e5f4df"),
+  module:    rgb("#e8e4ff"),
   operation: rgb("#f5e6d8"),
-  encoder: rgb("#dff2e1"),
-  decoder: rgb("#fde6d7"),
+  encoder:   rgb("#dff2e1"),
+  decoder:   rgb("#fde6d7"),
   attention: rgb("#f3def1"),
-  output: rgb("#e7ecef"),
-  group: rgb("#f7f7f7"),
+  output:    rgb("#e7ecef"),
+  group:     rgb("#f7f7f7"),
 )
 
-#let _text-block(title, subtitle: none, badge: none, title-size: 0.92em, subtitle-size: 0.72em) = align(center)[
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERNAL HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Text label ───────────────────────────────────────────────────────────────
+// Renders an optional badge (tiny), a bold title, and an optional subtitle.
+// All sizes are controllable; pass `badge: none` (default) to suppress the badge.
+#let _text-block(
+  title,
+  subtitle:      none,
+  badge:         none,
+  title-size:    0.92em,
+  subtitle-size: 0.72em,
+) = align(center)[
   #if badge != none [
     #text(size: 0.62em, fill: rgb("#5a6570"))[#badge]
     #linebreak()
@@ -28,6 +44,130 @@
   ]
 ]
 
+
+// ─── Stack drawing ────────────────────────────────────────────────────────────
+// Draws `count` overlapping rounded-rect copies.
+// Front copy (i = count-1, rendered last = on top) sits at offset (0, 0).
+// Each step further back adds (dx, dy) to the offset.
+// An optional `label` is centered inside the front copy only.
+#let _draw-stack(count, dx, dy, w, h, fill, stroke-clr, radius, label: none) = {
+  let sk = (paint: stroke-clr, thickness: 0.7pt)
+  let n  = calc.max(1, count)
+  box(width: w + dx * (n - 1), height: h + dy * (n - 1))[
+    #for i in range(n) {
+      let is-front = (i == n - 1)
+      place(
+        left + top,
+        dx: dx * (n - 1 - i),
+        dy: dy * (n - 1 - i),
+      )[
+        #rect(width: w, height: h, fill: fill, stroke: sk, radius: radius)[
+          #if is-front and label != none {
+            align(center + horizon)[#label]
+          }
+        ]
+      ]
+    }
+  ]
+}
+
+
+// ─── Shape drawing (for above / below label-pos) ──────────────────────────────
+// Draws a single shape as a plain Typst element so that a text label can be
+// positioned freely above or below it (outside the shape boundary).
+// Supported kinds: "rect" | "pill" | "circle" | "diamond" |
+//                  "trapezium-r" | "trapezium-l" | "hexagon"
+#let _draw-shape(w, h, fill, stroke-clr, kind, label: none) = {
+  let sk    = (paint: stroke-clr, thickness: 0.7pt)
+  let inner = if label != none { align(center + horizon)[#label] } else { none }
+
+  if kind == "pill" {
+    rect(width: w, height: h, fill: fill, stroke: sk, radius: calc.min(w, h) / 2)[#inner]
+
+  } else if kind == "circle" {
+    circle(width: w, fill: fill, stroke: sk)[#inner]
+
+  } else if kind == "diamond" {
+    box(width: w, height: h)[
+      #polygon(fill: fill, stroke: sk, (w / 2, 0pt), (w, h / 2), (w / 2, h), (0pt, h / 2))
+      #if inner != none { place(center + horizon, inner) }
+    ]
+
+  } else if kind == "trapezium-r" {
+    let a = h * calc.tan(18deg)
+    box(width: w, height: h)[
+      #polygon(fill: fill, stroke: sk, (0pt, 0pt), (w, a), (w, h - a), (0pt, h))
+      #if inner != none { place(center + horizon, inner) }
+    ]
+
+  } else if kind == "trapezium-l" {
+    let a = h * calc.tan(18deg)
+    box(width: w, height: h)[
+      #polygon(fill: fill, stroke: sk, (0pt, a), (w, 0pt), (w, h), (0pt, h - a))
+      #if inner != none { place(center + horizon, inner) }
+    ]
+
+  } else if kind == "hexagon" {
+    let d = w / 5
+    box(width: w, height: h)[
+      #polygon(fill: fill, stroke: sk,
+               (d, 0pt), (w - d, 0pt), (w, h / 2), (w - d, h), (d, h), (0pt, h / 2))
+      #if inner != none { place(center + horizon, inner) }
+    ]
+
+  } else {
+    // "rect" (default)
+    rect(width: w, height: h, fill: fill, stroke: sk, radius: 3pt)[#inner]
+  }
+}
+
+
+// ─── Compose label and shape ──────────────────────────────────────────────────
+// Stacks `shape-box` and `text-lbl` according to `pos`.
+//   "above"  → text above shape
+//   "below"  → text below shape
+//   "inside" → returns shape-box as-is (label already embedded inside)
+#let _compose(shape-box, text-lbl, pos, gap: 4pt) = {
+  if pos == "above" {
+    stack(dir: ttb, spacing: gap, text-lbl, shape-box)
+  } else if pos == "below" {
+    stack(dir: ttb, spacing: gap, shape-box, text-lbl)
+  } else {
+    shape-box   // "inside": label was embedded by _draw-stack / _draw-shape
+  }
+}
+
+
+// ─── Image stack drawing ──────────────────────────────────────────────────────
+// Like _draw-stack but every layer is a full-cover image box instead of a rect.
+// The front copy (i = count-1, on top) sits at offset (0, 0); each step further
+// back adds (dx, dy).  No label is embedded — place the caption outside via
+// caption-pos in image-dataset.
+#let _draw-image-stack(count, dx, dy, w, h, src, img, image-fit) = {
+  let n = calc.max(1, count)
+  box(width: w + dx * (n - 1), height: h + dy * (n - 1))[
+    #for i in range(n) {
+      place(
+        left + top,
+        dx: dx * (n - 1 - i),
+        dy: dy * (n - 1 - i),
+      )[
+        #box(width: w, height: h, clip: true, inset: 0pt)[
+          #if src != none {
+            image(src, width: w, height: h, fit: image-fit)
+          } else if img != none {
+            box(width: w, height: h)[#img]
+          } else {
+            rect(width: w, height: h, fill: rgb("#d8dde0"), stroke: none)
+          }
+        ]
+      ]
+    }
+  ]
+}
+
+
+// ─── Image helpers (unchanged) ────────────────────────────────────────────────
 #let _image-box(src: none, img: none, width: 24mm, height: 18mm, fit: "cover") = {
   box(width: width, height: height, clip: true, inset: 0pt)[
     #if src != none {
@@ -40,386 +180,564 @@
   ]
 }
 
-#let _image-label(title, subtitle: none, src: none, img: none, image-width: 24mm, image-height: 18mm, image-fit: "cover") = stack(
-  dir: ttb,
-  spacing: 3pt,
-  align(center)[#_image-box(src: src, img: img, width: image-width, height: image-height, fit: image-fit)],
+#let _image-label(
+  title, subtitle: none,
+  src: none, img: none,
+  image-width: 24mm, image-height: 18mm, image-fit: "cover",
+) = stack(
+  dir: ttb, spacing: 3pt,
+  align(center)[
+    #_image-box(src: src, img: img, width: image-width, height: image-height, fit: image-fit)
+  ],
   _text-block(title, subtitle: subtitle, title-size: 0.78em, subtitle-size: 0.64em),
 )
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA NODES  (dataset · batch · tensor · vector · embedding)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── dataset ──────────────────────────────────────────────────────────────────
+// A rectangular stacked node representing a data collection.
+//
+// Parameters
+// ──────────
+//   samples    Content shown as badge (e.g. [256 samples]).  none = no badge.
+//   stack      Number of layered copies (1 = single rect, no depth).
+//   stack-dx   Horizontal offset per layer  (default 2pt).
+//   stack-dy   Vertical offset per layer    (default 2pt).
+//   label-pos  "inside" | "above" | "below"
+//   title-size / subtitle-size  Control font sizes.
 #let dataset(
   id,
-  title: auto,
-  subtitle: none,
-  samples: none,
-  pos: auto,
-  after: none,
-  offset: (0, 0),
-  size: (2.1, 1.45),
-  unit: default-unit,
-  fill: palette.data,
-  stroke: rgb("#384655"),
-  stack: 3,
-  shape: auto,
+  title:         auto,
+  subtitle:      none,
+  samples:       none,
+  pos:           auto,
+  after:         none,
+  offset:        (0, 0),
+  size:          (2.1, 1.45),
+  unit:          default-unit,
+  fill:          palette.data,
+  stroke:        rgb("#384655"),
+  stack:         3,
+  stack-dx:      2pt,
+  stack-dy:      2pt,
+  label-pos:     "inside",
+  title-size:    0.92em,
+  subtitle-size: 0.72em,
   ..options,
 ) = {
-  let title = if title == auto { id } else { title }
-  let badge = if samples == none { [dataset] } else { [#samples] }
+  let title    = if title == auto { id } else { title }
+  let (w, h)   = to-size(size, unit: unit)
+  let text-lbl = _text-block(title, subtitle: subtitle, badge: samples,
+                              title-size: title-size, subtitle-size: subtitle-size)
+
+  let label = if label-pos == "inside" {
+    _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, 3pt, label: text-lbl)
+  } else {
+    let shape = _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, 3pt)
+    _compose(shape, text-lbl, label-pos)
+  }
+
   ml-node(
     id,
-    title: title,
-    subtitle: subtitle,
-    label: _text-block(title, subtitle: subtitle, badge: badge),
-    kind: "dataset",
-    role: "data",
-    pos: pos,
-    after: after,
-    offset: offset,
-    size: size,
-    unit: unit,
-    fill: fill,
-    stroke: stroke,
-    shape: shape,
-    corner-radius: 3pt,
-    extrude: if stack <= 1 { (0,) } else { range(stack).map(i => i * 2) },
+    title:         title,
+    subtitle:      subtitle,
+    label:         label,
+    kind:          "dataset",
+    role:          "data",
+    pos:           pos,
+    after:         after,
+    offset:        offset,
+    fill:          none,
+    stroke:        none,
+    shape:         shapes.rect,
+    corner-radius: 0pt,
+    inset:         0pt,
+    unit:          unit,
     ..options.named(),
   )
 }
 
+// ─── batch ────────────────────────────────────────────────────────────────────
+// dataset with a "batch" badge and a deeper stack by default.
 #let batch(id, title: auto, subtitle: none, stack: 4, ..options) = dataset(
   id,
-  title: if title == auto { id } else { title },
+  title:   if title == auto { id } else { title },
   subtitle: subtitle,
   samples: [batch],
-  stack: stack,
+  stack:   stack,
   ..options.named(),
 )
 
+// ─── tensor ───────────────────────────────────────────────────────────────────
+// A tensor node; dims can be shown as subtitle (e.g. dims: [B × T × D]).
 #let tensor(
   id,
-  title: auto,
+  title:    auto,
   subtitle: none,
-  dims: none,
-  size: (1.65, 1.25),
-  fill: palette.tensor,
-  stack: 5,
+  dims:     none,
+  size:     (1.65, 1.25),
+  fill:     palette.tensor,
+  stack:    5,
   ..options,
 ) = dataset(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: if dims == none { subtitle } else { dims },
-  samples: [tensor],
-  size: size,
-  fill: fill,
-  stack: stack,
+  title:    if title == auto { id } else { title },
+  subtitle: if dims != none { dims } else { subtitle },
+  samples:  none,
+  size:     size,
+  fill:     fill,
+  stack:    stack,
   ..options.named(),
 )
 
-#let vector(id, title: auto, subtitle: none, ..options) = ml-node(
-  id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  label: _text-block(if title == auto { id } else { title }, subtitle: subtitle, badge: [vector]),
-  kind: "vector",
-  role: "data",
-  shape: shapes.pill,
-  fill: palette.tensor,
-  stroke: rgb("#3f5f46"),
-  size: (2.2, 0.85),
-  ..options.named(),
-)
 
-#let embedding(id, title: auto, subtitle: none, ..options) = vector(
+// ─── vector ───────────────────────────────────────────────────────────────────
+// A pill-shaped vector node.
+//
+// Parameters
+// ──────────
+//   dir        "h" (horizontal, default) | "v" (vertical)
+//   size       Override the default pill dimensions.
+//   stack      Number of stacked copies (default 1 = single pill).
+//   stack-dx / stack-dy  Offset per layer.
+//   label-pos  "inside" | "above" | "below"
+#let vector(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: if subtitle == none { [embedding] } else { subtitle },
-  fill: rgb("#f0e6ff"),
-  ..options.named(),
-)
-
-// ─── image-node ────────────────────────────────────────────────────────────────
-//
-// New parameters:
-//   cover       (bool, default false)
-//     When true, the image fills the entire node area.  The node border and
-//     background are hidden (stroke: none, fill: none, inset: 0pt) so the raw
-//     image is the only visual element of the node itself.
-//
-//   caption-pos (string, default "bottom")
-//     Where to render the title/subtitle relative to the image when cover is
-//     true.  Accepted values: "bottom" | "top".
-//     Has no effect when cover is false.
-//
-// ───────────────────────────────────────────────────────────────────────────────
-#let image-node(
-  id,
-  title: auto,
-  subtitle: none,
-  src: none,
-  img: none,
-  image-size: (2.2, 1.65),
-  image-width: auto,
-  image-height: auto,
-  image-fit: "cover",
-  cover: false,
-  caption-pos: "bottom",
-  unit: default-unit,
-  fill: palette.image,
-  stroke: rgb("#5b5130"),
+  title:         auto,
+  subtitle:      none,
+  dir:           "h",
+  size:          auto,
+  stack:         1,
+  stack-dx:      2pt,
+  stack-dy:      2pt,
+  label-pos:     "inside",
+  title-size:    0.92em,
+  subtitle-size: 0.72em,
+  fill:          palette.tensor,
+  stroke:        rgb("#3f5f46"),
+  unit:          default-unit,
   ..options,
 ) = {
-  let title = if title == auto { id } else { title }
+  let title      = if title == auto { id } else { title }
+  let base-size  = if dir == "v" { (0.85, 2.2) } else { (2.2, 0.85) }
+  let (w, h)     = to-size(if size == auto { base-size } else { size }, unit: unit)
+  let radius     = calc.min(w, h) / 2
+  let text-lbl   = _text-block(title, subtitle: subtitle,
+                                title-size: title-size, subtitle-size: subtitle-size)
+
+  let label = if label-pos == "inside" {
+    _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, radius, label: text-lbl)
+  } else {
+    let shape = _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, radius)
+    _compose(shape, text-lbl, label-pos)
+  }
+
+  ml-node(
+    id,
+    title:         title,
+    subtitle:      subtitle,
+    label:         label,
+    kind:          "vector",
+    role:          "data",
+    fill:          none,
+    stroke:        none,
+    shape:         shapes.rect,
+    corner-radius: 0pt,
+    inset:         0pt,
+    unit:          unit,
+    ..options.named(),
+  )
+}
+
+// ─── embedding ────────────────────────────────────────────────────────────────
+#let embedding(id, title: auto, subtitle: none, ..options) = vector(
+  id,
+  title:    if title == auto { id } else { title },
+  subtitle: subtitle,
+  fill:     rgb("#f0e6ff"),
+  ..options.named(),
+)
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// IMAGE NODES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── image-node ───────────────────────────────────────────────────────────────
+// Parameters
+// ──────────
+//   cover       When true the image fills the node; border is hidden.
+//   caption-pos "bottom" | "top" — caption placement when cover is true.
+#let image-node(
+  id,
+  title:        auto,
+  subtitle:     none,
+  src:          none,
+  img:          none,
+  image-size:   (2.2, 1.65),
+  image-width:  auto,
+  image-height: auto,
+  image-fit:    "cover",
+  cover:        false,
+  caption-pos:  "bottom",
+  unit:         default-unit,
+  fill:         palette.image,
+  stroke:       rgb("#5b5130"),
+  ..options,
+) = {
+  let title  = if title == auto { id } else { title }
   let (iw, ih) = to-size(image-size, width: image-width, height: image-height, unit: unit)
 
   if cover {
-    // Build image and optional caption as separate stack items so that the
-    // caption sits visually outside the image boundary.
     let img-box = _image-box(src: src, img: img, width: iw, height: ih, fit: image-fit)
-
     let caption = if title != none or subtitle != none {
-      // Pad on the side that faces the image so the gap is always between
-      // the caption text and the image, regardless of caption position.
-      let caption-pad = if caption-pos == "top" { (bottom: 2pt) } else { (top: 2pt) }
-      pad(..caption-pad)[
+      let pad-side = if caption-pos == "top" { (bottom: 2pt) } else { (top: 2pt) }
+      pad(..pad-side)[
         #_text-block(title, subtitle: subtitle, title-size: 0.78em, subtitle-size: 0.64em)
       ]
     }
+    let lbl = if caption == none       { img-box }
+              else if caption-pos == "top" { stack(dir: ttb, spacing: 0pt, caption, img-box) }
+              else                     { stack(dir: ttb, spacing: 0pt, img-box, caption) }
 
-    let lbl = if caption == none {
-      img-box
-    } else if caption-pos == "top" {
-      stack(dir: ttb, spacing: 0pt, caption, img-box)
-    } else {
-      stack(dir: ttb, spacing: 0pt, img-box, caption)
-    }
-
-    ml-node(
-      id,
-      title: title,
-      subtitle: subtitle,
-      label: lbl,
-      kind: "image",
-      role: "data",
-      // No fill and no stroke: the image box itself is the only visual.
-      fill: none,
-      stroke: none,
-      shape: shapes.rect,
-      corner-radius: 0pt,
-      inset: 0pt,
-      ..options.named(),
-    )
+    ml-node(id, title: title, subtitle: subtitle, label: lbl,
+            kind: "image", role: "data",
+            fill: none, stroke: none, shape: shapes.rect,
+            corner-radius: 0pt, inset: 0pt, ..options.named())
   } else {
-    ml-node(
-      id,
-      title: title,
-      subtitle: subtitle,
-      label: _image-label(title, subtitle: subtitle, src: src, img: img, image-width: iw, image-height: ih, image-fit: image-fit),
-      kind: "image",
-      role: "data",
-      fill: fill,
-      stroke: stroke,
-      shape: shapes.rect,
-      corner-radius: 2pt,
-      inset: 4pt,
-      ..options.named(),
-    )
+    ml-node(id, title: title, subtitle: subtitle,
+            label: _image-label(title, subtitle: subtitle, src: src, img: img,
+                                 image-width: iw, image-height: ih, image-fit: image-fit),
+            kind: "image", role: "data",
+            fill: fill, stroke: stroke, shape: shapes.rect,
+            corner-radius: 2pt, inset: 4pt, ..options.named())
   }
 }
 
-#let image-dataset(id, title: auto, subtitle: none, stack: 3, ..options) = {
-  let n = image-node(
-    id,
-    title: if title == auto { id } else { title },
-    subtitle: subtitle,
-    ..options.named(),
-  )
-  n.kind = "image-dataset"
-  n.extrude = if stack <= 1 { (0,) } else { range(stack).map(i => i * 2) }
-  n
+// ─── image-dataset ────────────────────────────────────────────────────────────
+// A stacked-image node: `stack` image copies rendered with (dx, dy) offsets,
+// each layer being a full-cover image (no border).  An optional caption is
+// placed above or below the whole stack via `caption-pos`.
+//
+// Parameters
+// ──────────
+//   src / img        Image source path or pre-built Typst image element.
+//   image-size       (w, h) of each image card in the stack.
+//   image-width /
+//   image-height     Override individual card dimensions (auto = from image-size).
+//   image-fit        Fit mode passed to image() — "cover" by default.
+//   stack            Number of stacked copies (default 3; 1 = single card).
+//   stack-dx         Horizontal offset per layer (default 3pt).
+//   stack-dy         Vertical offset per layer   (default 3pt).
+//   caption-pos      "bottom" (default) | "top"
+//   title-size /
+//   subtitle-size    Font sizes for the caption text.
+#let image-dataset(
+  id,
+  title:         auto,
+  subtitle:      none,
+  src:           none,
+  img:           none,
+  image-size:    (2.2, 1.65),
+  image-width:   auto,
+  image-height:  auto,
+  image-fit:     "cover",
+  caption-pos:   "bottom",
+  stack:         3,
+  stack-dx:      3pt,
+  stack-dy:      3pt,
+  title-size:    0.78em,
+  subtitle-size: 0.64em,
+  unit:          default-unit,
+  ..options,
+) = {
+  let title    = if title == auto { id } else { title }
+  let (iw, ih) = to-size(image-size, width: image-width, height: image-height, unit: unit)
+
+  let img-stack = _draw-image-stack(stack, stack-dx, stack-dy, iw, ih, src, img, image-fit)
+
+  let caption = if title != none or subtitle != none {
+    pad(
+      top:    if caption-pos == "bottom" { 2pt } else { 0pt },
+      bottom: if caption-pos == "top"    { 2pt } else { 0pt },
+    )[
+      #_text-block(title, subtitle: subtitle,
+                   title-size: title-size, subtitle-size: subtitle-size)
+    ]
+  }
+
+  // Compose caption + stack without calling the built-in stack() function
+  // (which is shadowed by the `stack` parameter in this scope).
+  let lbl = if caption == none {
+    img-stack
+  } else {
+    let first  = if caption-pos == "top"    { caption }   else { img-stack }
+    let second = if caption-pos == "bottom" { caption }   else { img-stack }
+    grid(rows: (auto, auto), gutter: 0pt, first, second)
+  }
+
+  ml-node(id, title: title, subtitle: subtitle, label: lbl,
+          kind: "image-dataset", role: "data",
+          fill: none, stroke: none, shape: shapes.rect,
+          corner-radius: 0pt, inset: 0pt, unit: unit,
+          ..options.named())
 }
 
-// ─── text-node ─────────────────────────────────────────────────────────────────
-// A borderless, background-free node for inline text or mathematical formulas.
-//
-// Usage:
-//   #text-node("t1", $bold(z) = f(bold(x))$)
-//   #text-node("t2", [… or any Typst content …])
-//
-// Parameters:
-//   body        – any Typst content (text, math, markup)
-//   size        – font size of the body (default 1em)
-//   color       – text/math color (default black)
-// ───────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UTILITY NODES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── text-node ────────────────────────────────────────────────────────────────
+// A borderless, background-free node for inline text or math formulas.
 #let text-node(
   id,
   body,
-  size: 1em,
-  color: black,
+  size:      1em,
+  color:     black,
   node-size: auto,
-  unit: default-unit,
+  unit:      default-unit,
   ..options,
 ) = {
   let resolved-size = if node-size == auto { auto } else { to-size(node-size, unit: unit) }
-  ml-node(
-    id,
-    label: align(center, text(size: size, fill: color)[#body]),
-    kind: "text",
-    role: "annotation",
-    fill: none,
-    stroke: none,
-    inset: 2pt,
-    corner-radius: 0pt,
-    size: resolved-size,
-    ..options.named(),
-  )
+  ml-node(id,
+          label: align(center, text(size: size, fill: color)[#body]),
+          kind: "text", role: "annotation",
+          fill: none, stroke: none, inset: 2pt, corner-radius: 0pt,
+          size: resolved-size, ..options.named())
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MODULE NODES  (module · layer · encoder · decoder · attention · …)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── module ───────────────────────────────────────────────────────────────────
+// Base for all "box-type" nodes.  Specific nodes (layer, encoder …) call this
+// with appropriate shape / shape-kind / fill presets.
+//
+// Parameters
+// ──────────
+//   badge        Small text above the title.  none = no badge (default).
+//   label-pos    "inside" (default) | "above" | "below"
+//                  "inside"  → title rendered inside the Fletcher shape (standard)
+//                  "above"   → shape drawn as Typst element, title sits above it
+//                  "below"   → same, title sits below
+//   shape-kind   Shape name used when label-pos ≠ "inside":
+//                  "rect" | "pill" | "circle" | "diamond" |
+//                  "trapezium-r" | "trapezium-l" | "hexagon"
+//   title-size / subtitle-size  Font sizes passed to _text-block.
+//   size         Node dimensions as (w, h) in `unit`.
+//                When label-pos ≠ "inside" and size is auto, defaults to (2.6, 1.4).
 #let module(
   id,
-  title: auto,
-  subtitle: none,
-  badge: none,
-  kind: "module",
-  role: "module",
-  fill: palette.module,
-  stroke: rgb("#48415f"),
-  shape: shapes.rect,
-  size: auto,
+  title:         auto,
+  subtitle:      none,
+  badge:         none,
+  kind:          "module",
+  role:          "module",
+  fill:          palette.module,
+  stroke:        rgb("#48415f"),
+  shape:         shapes.rect,
+  shape-kind:    "rect",
+  size:          auto,
+  label-pos:     "inside",
+  title-size:    0.92em,
+  subtitle-size: 0.72em,
+  unit:          default-unit,
   ..options,
 ) = {
-  let title = if title == auto { id } else { title }
-  ml-node(
-    id,
-    title: title,
-    subtitle: subtitle,
-    label: _text-block(title, subtitle: subtitle, badge: badge),
-    kind: kind,
-    role: role,
-    fill: fill,
-    stroke: stroke,
-    shape: shape,
-    size: size,
-    corner-radius: 3pt,
-    ..options.named(),
-  )
+  let title    = if title == auto { id } else { title }
+  let text-lbl = _text-block(title, subtitle: subtitle, badge: badge,
+                              title-size: title-size, subtitle-size: subtitle-size)
+
+  if label-pos == "inside" {
+    // Standard mode: Fletcher renders the shape; label lives inside it.
+    ml-node(id, title: title, subtitle: subtitle, label: text-lbl,
+            kind: kind, role: role, fill: fill, stroke: stroke,
+            shape: shape, size: size, corner-radius: 3pt, unit: unit,
+            ..options.named())
+
+  } else {
+    // Drawn mode: we paint the shape ourselves so that text can float outside.
+    let (w, h) = to-size(if size == auto { (2.6, 1.4) } else { size }, unit: unit)
+    let shape-box = _draw-shape(w, h, fill, stroke, shape-kind)
+    let lbl = _compose(shape-box, text-lbl, label-pos)
+    ml-node(id, title: title, subtitle: subtitle, label: lbl,
+            kind: kind, role: role,
+            fill: none, stroke: none, shape: shapes.rect,
+            corner-radius: 0pt, inset: 0pt, unit: unit,
+            ..options.named())
+  }
 }
 
-#let operation(id, title: auto, subtitle: none, ..options) = module(
-  id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [op],
-  kind: "operation",
-  role: "operation",
-  fill: palette.operation,
-  shape: shapes.hexagon,
-  ..options.named(),
-)
+// ─── Specific module presets ──────────────────────────────────────────────────
+// All badges default to `none`.  Set badge: [layer] (or whichever) to display.
 
 #let layer(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [layer],
-  fill: rgb("#edf0ff"),
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       rgb("#edf0ff"),
+  shape-kind: "rect",
   ..options.named(),
 )
 
 #let encoder(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [encoder],
-  fill: palette.encoder,
-  shape: shapes.trapezium.with(dir: right, angle: 18deg),
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       palette.encoder,
+  shape:      shapes.trapezium.with(dir: right, angle: 18deg),
+  shape-kind: "trapezium-r",
   ..options.named(),
 )
 
 #let decoder(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [decoder],
-  fill: palette.decoder,
-  shape: shapes.trapezium.with(dir: left, angle: 18deg),
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       palette.decoder,
+  shape:      shapes.trapezium.with(dir: left, angle: 18deg),
+  shape-kind: "trapezium-l",
   ..options.named(),
 )
 
 #let attention(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [attention],
-  fill: palette.attention,
-  shape: shapes.diamond.with(fit: 0.45),
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       palette.attention,
+  shape:      shapes.diamond.with(fit: 0.45),
+  shape-kind: "diamond",
   ..options.named(),
 )
 
 #let transformer(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: if subtitle == none { [self-attention + MLP] } else { subtitle },
-  badge: [transformer],
-  fill: rgb("#ece7ff"),
-  size: (2.8, 1.6),
+  title:      if title == auto { id } else { title },
+  subtitle:   if subtitle == none { [self-attention + MLP] } else { subtitle },
+  fill:       rgb("#ece7ff"),
+  size:       (2.8, 1.6),
+  shape-kind: "rect",
   ..options.named(),
 )
 
 #let io-node(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  badge: [io],
-  fill: palette.output,
-  shape: shapes.pill,
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       palette.output,
+  shape:      shapes.pill,
+  shape-kind: "pill",
   ..options.named(),
 )
 
 #let decision(id, title: auto, subtitle: none, ..options) = module(
   id,
-  title: if title == auto { id } else { title },
-  subtitle: subtitle,
-  fill: rgb("#fff1c7"),
-  shape: shapes.diamond,
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  fill:       rgb("#fff1c7"),
+  shape:      shapes.diamond,
+  shape-kind: "diamond",
   ..options.named(),
 )
 
-// ─── arrow-node ─────────────────────────────────────────────────────────────
-//
-// A node displayed as a directional arrow, with a label that can sit inside
-// the arrow or above/below it.
+#let operation(id, title: auto, subtitle: none, ..options) = module(
+  id,
+  title:      if title == auto { id } else { title },
+  subtitle:   subtitle,
+  kind:       "operation",
+  role:       "operation",
+  fill:       palette.operation,
+  shape:      shapes.hexagon,
+  shape-kind: "hexagon",
+  ..options.named(),
+)
+
+
+// ─── gate-node ────────────────────────────────────────────────────────────────
+// Renders a logic / math gate symbol with NO surrounding shape.
+// The symbol is displayed as-is; an optional title floats above or below.
 //
 // Parameters
 // ──────────
-//   dir         Direction the arrow points.
-//               Accepts Typst cardinal values: right, left, top, bottom.
+//   symbol       The operation to display. Built-in shorthands:
+//                  "xor"  →  ⊕   (default)
+//                  "mul"  →  ×
+//                  "add"  →  +
+//                  "and"  →  ∧
+//                  "or"   →  ∨
+//                Any other string or Typst content is rendered directly.
+//   title        Optional descriptive label.
+//   label-pos    "below" (default) | "above"
+//   symbol-size  Font size of the gate symbol  (default 1.8em).
+//   title-size   Font size of the optional title (default 0.78em).
+//   gap          Spacing between symbol and title (default 2pt).
+#let gate-node(
+  id,
+  symbol:      "xor",
+  title:       none,
+  label-pos:   "below",
+  symbol-size: 1.8em,
+  title-size:  0.78em,
+  gap:         2pt,
+  dy:          3pt,   // shift symbol up (negative) or down (positive) to visually center it within the bbox
+  unit:        default-unit,
+  ..options,
+) = {
+  let sym-char = if symbol == "xor" { $plus.o$ }
+                 else if symbol == "mul" { $times$ }
+                 else if symbol == "add" { $+$ }
+                 else if symbol == "and" { $and$ }
+                 else if symbol == "or"  { $or$ }
+                 else { [#symbol] }
+
+  let sym-box = align(center + horizon)[#text(size: symbol-size)[#sym-char]]
+
+  let text-lbl = if title != none {
+    align(center)[#text(size: title-size, weight: "semibold")[#title]]
+  } else { none }
+
+  // Asymmetrically pad the symbol box to visually center it within the node bbox, since some symbols (e.g. "xor") can appear optically higher or lower than geometric center.
+  let top-pad    = if dy < 0pt { -dy } else { 0pt }
+  let bottom-pad = if dy > 0pt {  dy } else { 0pt }
+
+  let core = pad(top: top-pad, bottom: bottom-pad, sym-box)
+
+  let lbl = if text-lbl == none {
+    core
+  } else if label-pos == "above" {
+    stack(dir: ttb, spacing: gap, text-lbl, core)
+  } else {
+    stack(dir: ttb, spacing: gap, core, text-lbl)
+  }
+
+  ml-node(id, label: lbl,
+          kind: "gate", role: "operation",
+          fill: none, stroke: none,
+          shape: shapes.rect,
+          corner-radius: 0pt, inset: 0pt, unit: unit,
+          ..options.named())
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ARROW NODE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── arrow-node ───────────────────────────────────────────────────────────────
+// A directional arrow node (unchanged from original).
 //
-//   shape       Arrow visual style:
-//                 "arrow"    (default) — classic 7-point notched arrow with tail
-//                 "chevron"  — 6-point pentagon arrow, no tail
-//                 "triangle" — simple 3-point triangle
-//               When label-pos is "inside", you may instead pass a Fletcher
-//               shape function directly (e.g. shapes.chevron.with(dir: right)).
-//
-//   label-pos   Where to render the title relative to the arrow visual:
-//                 "inside" — text rendered inside the Fletcher node shape
-//                 "above"  — arrow drawn as a polygon; label floats above
-//                 "below"  — arrow drawn as a polygon; label floats below
-//               Default: "below"
-//
-//   size        (width, height) of the arrow visual expressed in `unit`.
-//               Default: (2.6, 1.1)
-//
-//   fill        Fill colour of the arrow.
-//   stroke      Border colour of the arrow.
-//
-// Examples
-// ────────
-//   #arrow-node("fwd",  dir: right,  shape: "arrow",   label-pos: "below")
-//   #arrow-node("up",   dir: top,    shape: "chevron",  label-pos: "above")
-//   #arrow-node("tri",  dir: bottom, shape: "triangle", label-pos: "inside")
-//
-// ─────────────────────────────────────────────────────────────────────────────
+// Parameters
+// ──────────
+//   dir        right | left | top | bottom
+//   shape      "arrow" (default) | "chevron" | "triangle"
+//   label-pos  "below" (default) | "above" | "inside"
+//   size       (w, h) in `unit`.
 #let arrow-node(
   id,
   title:     auto,
@@ -437,34 +755,27 @@
   let (w, h) = to-size(size, unit: unit)
   let sk     = (paint: stroke, thickness: 0.6pt, join: "miter")
 
-  // ── polygon point-sets ─────────────────────────────────────────────────────
-  // All coordinates are absolute lengths derived from (w, h).
   let _pts(dir, kind) = {
     if kind == "triangle" {
-      if      dir == right  { ((0pt, 0pt),  (w,  h/2), (0pt, h  )) }
-      else if dir == left   { ((w,   0pt),  (0pt, h/2), (w,  h  )) }
-      else if dir == bottom { ((0pt, 0pt),  (w,  0pt), (w/2, h  )) }
-      else                  { ((0pt, h  ),  (w,  h  ), (w/2, 0pt)) }  // top
+      if      dir == right  { ((0pt, 0pt), (w, h / 2), (0pt, h)) }
+      else if dir == left   { ((w, 0pt), (0pt, h / 2), (w, h)) }
+      else if dir == bottom { ((0pt, 0pt), (w, 0pt), (w / 2, h)) }
+      else                  { ((0pt, h), (w, h), (w / 2, 0pt)) }
 
     } else if kind == "chevron" {
-      // 6-point arrow, no rectangular tail
       let t = 0.35
       if      dir == right  {
-        ((0pt,    0pt),   (w*(1-t), 0pt),   (w,     h/2),
-         (w*(1-t), h),   (0pt,      h),     (w*t,   h/2))
+        ((0pt, 0pt), (w*(1-t), 0pt), (w, h/2), (w*(1-t), h), (0pt, h), (w*t, h/2))
       } else if dir == left {
-        ((w,      0pt),   (w*t,    0pt),    (0pt,   h/2),
-         (w*t,    h),    (w,       h),      (w*(1-t), h/2))
+        ((w, 0pt), (w*t, 0pt), (0pt, h/2), (w*t, h), (w, h), (w*(1-t), h/2))
       } else if dir == bottom {
-        ((0pt,    0pt),   (w,      0pt),    (w,     h*(1-t)),
-         (w/2,   h),     (0pt,    h*(1-t)))
-      } else {                                                         // top
-        ((0pt,   h),     (w,      h),      (w,     h*t),
-         (w/2,  0pt),    (0pt,   h*t))
+        ((0pt, 0pt), (w, 0pt), (w, h*(1-t)), (w/2, h), (0pt, h*(1-t)))
+      } else {
+        ((0pt, h), (w, h), (w, h*t), (w/2, 0pt), (0pt, h*t))
       }
 
     } else {
-      // "arrow" – classic 7-point notched arrow with a rectangular tail
+      // "arrow" – classic 7-point notched arrow
       if      dir == right  {
         let ny = h * 0.22; let tx = w * 0.60
         ((0pt, ny), (tx, ny), (tx, 0pt), (w, h/2), (tx, h), (tx, h - ny), (0pt, h - ny))
@@ -473,45 +784,23 @@
         ((w, ny), (tx, ny), (tx, 0pt), (0pt, h/2), (tx, h), (tx, h - ny), (w, h - ny))
       } else if dir == bottom {
         let nx = w * 0.22; let ty = h * 0.60
-        ((nx, 0pt), (w - nx, 0pt), (w - nx, ty), (w, ty), (w/2, h), (0pt, ty), (nx, ty))
-      } else {                                                         // top
+        ((nx, 0pt), (w-nx, 0pt), (w-nx, ty), (w, ty), (w/2, h), (0pt, ty), (nx, ty))
+      } else {
         let nx = w * 0.22; let ty = h * 0.40
-        ((nx, h), (w - nx, h), (w - nx, ty), (w, ty), (w/2, 0pt), (0pt, ty), (nx, ty))
+        ((nx, h), (w-nx, h), (w-nx, ty), (w, ty), (w/2, 0pt), (0pt, ty), (nx, ty))
       }
     }
   }
 
   if label-pos == "inside" {
-    // ── Fletcher node: text label rendered inside the arrow outline ──────────
-    // If the caller provided a raw string shape name, map to the closest
-    // Fletcher built-in (shapes.chevron honours the `dir` parameter and is
-    // the best universal match). If the caller passed a Fletcher shape
-    // function directly, use it as-is.
-    let node-shape = if type(shape) == str {
-      shapes.chevron.with(dir: dir)
-    } else {
-      shape
-    }
-    ml-node(
-      id,
-      title:         title,
-      subtitle:      subtitle,
-      label:         _text-block(title, subtitle: subtitle),
-      kind:          "arrow",
-      role:          "operation",
-      fill:          fill,
-      stroke:        stroke,
-      shape:         node-shape,
-      size:          size,
-      unit:          unit,
-      corner-radius: 2pt,
-      ..options.named(),
-    )
-
+    let node-shape = if type(shape) == str { shapes.chevron.with(dir: dir) } else { shape }
+    ml-node(id, title: title, subtitle: subtitle,
+            label: _text-block(title, subtitle: subtitle),
+            kind: "arrow", role: "operation",
+            fill: fill, stroke: stroke, shape: node-shape,
+            size: size, unit: unit, corner-radius: 2pt,
+            ..options.named())
   } else {
-    // ── Drawn-polygon mode: arrow visual + caption stacked ───────────────────
-    // The ml-node acts as an invisible container (no fill, no stroke) so that
-    // the hand-drawn polygon is the only visible element.
     let kind = if type(shape) == str { shape } else { "arrow" }
     let arrow-box = box(width: w, height: h)[
       #polygon(fill: fill, stroke: sk, .._pts(dir, kind))
@@ -524,49 +813,118 @@
     } else {
       stack(dir: ttb, spacing: 4pt, arrow-box, caption)
     }
-    ml-node(
-      id,
-      title:         title,
-      subtitle:      subtitle,
-      label:         lbl,
-      kind:          "arrow",
-      role:          "operation",
-      fill:          none,
-      stroke:        none,
-      shape:         shapes.rect,
-      corner-radius: 0pt,
-      inset:         0pt,
-      unit:          unit,
-      ..options.named(),
-    )
+    ml-node(id, title: title, subtitle: subtitle, label: lbl,
+            kind: "arrow", role: "operation",
+            fill: none, stroke: none, shape: shapes.rect,
+            corner-radius: 0pt, inset: 0pt, unit: unit,
+            ..options.named())
   }
 }
+
+// ─── compare-node ─────────────────────────────────────────────────────────────
+// A right-pointing isosceles triangle ("play button" style).
+// Vertices: (0, 0) → (w, h/2) → (0, h)
+//
+// Parameters
+// ──────────
+//   title / subtitle / badge   Text displayed according to label-pos.
+//   size       (w, h) of the triangle.  Keep w ≈ h for a balanced shape.
+//   fill       Fill colour.
+//   stroke     Outline colour.
+//   label-pos  "inside" (default) | "above" | "below" | "right" | "left"
+//                "inside" → text centred in the left portion of the triangle
+//                           (around the centroid: x = w/3, y = h/2)
+//                "right"  → text to the right of the tip  (most readable)
+//                "above" / "below" / "left"  → same behaviour as other nodes
+//   title-size / subtitle-size   Font sizes.
+#let compare-node(
+  id,
+  title:         auto,
+  subtitle:      none,
+  badge:         none,
+  size:          (1.8, 1.8),
+  fill:          palette.operation,
+  stroke:        rgb("#7a5030"),
+  label-pos:     "inside",
+  title-size:    0.82em,
+  subtitle-size: 0.72em,
+  unit:          default-unit,
+  ..options,
+) = {
+  let title  = if title == auto { id } else { title }
+  let (w, h) = to-size(size, unit: unit)
+  let sk     = (paint: stroke, thickness: 0.7pt, join: "miter")
+
+  let text-lbl = _text-block(title, subtitle: subtitle, badge: badge,
+                              title-size: title-size, subtitle-size: subtitle-size)
+
+  // ── Triangle drawing ──────────────────────────────────────────────────────
+  // Centroid sits at (w/3, h/2).  Text is centred inside a box covering
+  // the usable interior area (the leftmost 62 % of the triangle).
+  let tri-box(inner: none) = box(width: w, height: h)[
+    #polygon(fill: fill, stroke: sk,
+             (0pt, 0pt), (w, h / 2), (0pt, h))
+    #if inner != none {
+      place(left + top)[
+        #box(width: w * 0.62, height: h)[
+          #align(center + horizon)[#inner]
+        ]
+      ]
+    }
+  ]
+
+  // ── Label + triangle composition ──────────────────────────────────────────
+  let lbl = if label-pos == "inside" {
+    tri-box(inner: text-lbl)
+
+  } else if label-pos == "above" {
+    stack(dir: ttb, spacing: 4pt, align(center)[#text-lbl], tri-box())
+
+  } else if label-pos == "below" {
+    stack(dir: ttb, spacing: 4pt, tri-box(), align(center)[#text-lbl])
+
+  } else if label-pos == "right" {
+    // Text to the right of the tip — most natural for this shape
+    stack(dir: ltr, spacing: 6pt, tri-box(), align(left + horizon)[#text-lbl])
+
+  } else if label-pos == "left" {
+    stack(dir: ltr, spacing: 6pt, align(right + horizon)[#text-lbl], tri-box())
+
+  } else {
+    tri-box(inner: text-lbl)
+  }
+
+  ml-node(id, title: title, subtitle: subtitle, label: lbl,
+          kind: "compare", role: "operation",
+          fill: none, stroke: none, shape: shapes.rect,
+          corner-radius: 0pt, inset: 0pt, unit: unit,
+          ..options.named())
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GROUP
+// ═══════════════════════════════════════════════════════════════════════════════
 
 #let group(
   id,
   children,
-  title: auto,
+  title:    auto,
   subtitle: none,
-  fill: palette.group,
-  stroke: rgb("#77808a"),
-  outset: 10pt,
+  fill:     palette.group,
+  stroke:   rgb("#77808a"),
+  outset:   10pt,
   ..options,
 ) = {
   let title = if title == auto { id } else { title }
-  ml-node(
-    id,
-    title: title,
-    subtitle: subtitle,
-    label: _text-block(title, subtitle: subtitle),
-    kind: "group",
-    role: "group",
-    enclose: ensure-array(children).map(node-ref),
-    fill: fill,
-    stroke: (paint: stroke, dash: "dashed"),
-    inset: 8pt,
-    outset: outset,
-    layer: -1,
-    snap: false,
-    ..options.named(),
-  )
+  ml-node(id,
+          title: title, subtitle: subtitle,
+          label: _text-block(title, subtitle: subtitle),
+          kind: "group", role: "group",
+          enclose: ensure-array(children).map(node-ref),
+          fill: fill,
+          stroke: (paint: stroke, dash: "dashed"),
+          inset: 8pt, outset: outset,
+          layer: -1, snap: false,
+          ..options.named())
 }

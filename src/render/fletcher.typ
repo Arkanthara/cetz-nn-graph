@@ -35,27 +35,66 @@
 }
 
 #let _render-edge(e) = {
-  let vertices = (anchor-ref(e.from, side: e.from-side),)
-  if e.via != none {
-    vertices += e.via
+
+  // Resolve start and end anchors (respects from-side / to-side).
+  let from-anchor = anchor-ref(e.from, side: e.from-side)
+  let to-anchor   = anchor-ref(e.to,   side: e.to-side)
+
+  // ── Build the vertex list ─────────────────────────────────────────────────
+  let vertices = if e.orthogonal != false {
+
+    // Determine the Fletcher bend-notation to use for each segment:
+    //   "-|"  horizontal-first (go right/left until aligned, then turn)
+    //   "|-"  vertical-first   (go up/down    until aligned, then turn)
+    let dir = if e.orthogonal == "v" { "|-" } else { "-|" }
+
+    // Collect all required waypoints in order: source → via… → destination.
+    // Via points are optional; omitting them yields a simple L-shaped path.
+    let pts = (from-anchor,)
+    if e.via != none { pts += e.via }
+    pts.push(to-anchor)
+
+    // For every consecutive pair (p1, p2), insert one orthogonal corner vertex.
+    // Fletcher interprets (p1, "-|", p2) as:
+    //   "travel horizontally from p1 to p2's column, then vertically to p2"
+    // — producing a true right-angle bend without any manual grid hops.
+    let verts = (pts.at(0),)
+    for i in range(pts.len() - 1) {
+      let p1 = pts.at(i)
+      let p2 = pts.at(i + 1)
+      verts.push((p1, dir, p2)) // synthetic 90° corner
+      verts.push(p2)
+    }
+    verts
+
+  } else {
+
+    // Standard routing: chain anchors and raw via points as given.
+    let verts = (from-anchor,)
+    if e.via != none { verts += e.via }
+    verts.push(to-anchor)
+    verts
+
   }
-  vertices.push(anchor-ref(e.to, side: e.to-side))
+  // ─────────────────────────────────────────────────────────────────────────
+
   f-edge(
     ..vertices,
     e.mark,
-    label: e.label,
-    label-pos: e.label-pos,
-    label-side: _side(e.label-side),
-    label-sep: e.label-sep,
-    stroke: e.stroke,
-    dash: e.dash,
-    decorations: e.decorations,
-    bend: e.bend,
-    corner: e.corner,
+    label:         e.label,
+    label-pos:     e.label-pos,
+    label-side:    _side(e.label-side),
+    label-sep:     e.label-sep,
+    stroke:        e.stroke,
+    dash:          e.dash,
+    decorations:   e.decorations,
+    bend:          e.bend,
+    corner:        e.corner,
     corner-radius: e.corner-radius,
-    crossing: e.crossing,
-    layer: e.layer,
-    floating: e.floating,
+    crossing:      e.crossing,
+    layer:         e.layer,
+    floating:      e.floating,
+    shift:         (e.from-shift, e.to-shift),
   )
 }
 

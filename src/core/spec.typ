@@ -99,6 +99,20 @@
   floating: false,
   name: none,
   meta: (:),
+  // Orthogonal routing mode.
+  //   false      → normal behaviour, no automatic bending (default)
+  //   true / "h" → horizontal-first: move right/left, then up/down  ("-|")
+  //   "v"        → vertical-first:   move up/down,    then right/left ("|-")
+  //
+  // Via points still act as required intermediate waypoints; one 90-degree
+  // bend is inserted automatically between every consecutive pair of points.
+  // Example – instead of  via: ("r", "r", "r", "u")  just write:
+  //   ml-edge("10", "7", orthogonal: true)
+  // or, for a Z-shaped path through an explicit midpoint:
+  //   ml-edge("10", "7", via: (midNode,), orthogonal: true)
+  orthogonal: false,
+  from-shift: 0pt,
+  to-shift: 0pt,
   ..extra,
 ) = (
   class: "neural-edge",
@@ -124,6 +138,10 @@
   floating: floating,
   name: name,
   meta: meta,
+  orthogonal: orthogonal,   // forwarded to _render-edge
+  from-shift: from-shift,
+  to-shift: to-shift,
+  extra: extra.named(),
 )
 
 #let with-pos(node, pos) = {
