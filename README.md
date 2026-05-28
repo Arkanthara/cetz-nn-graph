@@ -52,11 +52,12 @@ Core:
 
 ML nodes:
 
-- Data: `dataset`, `batch`, `tensor`, `vector`, `embedding`
+- Data: `dataset`, `batch`, `tensor`, `vector`, `embedding`, `table-node`
 - Images: `image-node`, `image-dataset`
 - Components: `module`, `operation`, `layer`, `encoder`, `decoder`,
   `attention`, `transformer`, `io-node`, `decision`
 - Composition: `group`
+- Cell helpers: `table-cell`
 
 Migration shims:
 

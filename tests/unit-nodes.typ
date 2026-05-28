@@ -29,6 +29,15 @@
 #assert.eq(g.enclose, (<enc>, <dec>))
 #assert.eq(g.layer, -1)
 
+#let tbl = table-node(
+  "metrics",
+  rows: 2,
+  columns: 2,
+  cells: ([A], [B], [C], [D]),
+)
+#assert.eq(tbl.kind, "table")
+#assert.eq(tbl.role, "data")
+
 #showcase(
   "Node constructors",
   join_lines((

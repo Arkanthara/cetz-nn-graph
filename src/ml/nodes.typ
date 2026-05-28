@@ -196,6 +196,132 @@
 )
 
 
+// ─── Table helpers ───────────────────────────────────────────────────────────
+#let _repeat(value, count) = {
+  let out = ()
+  for _ in range(count) { out.push(value) }
+  out
+}
+
+#let _size-list(values, count, fallback, unit) = {
+  let raw = if values == auto or values == none {
+    _repeat(fallback, count)
+  } else if type(values) == array {
+    values
+  } else {
+    _repeat(values, count)
+  }
+
+  let out = ()
+  for i in range(count) {
+    let v = if i < raw.len() { raw.at(i) } else { fallback }
+    out.push(to-length(v, unit: unit))
+  }
+  out
+}
+
+#let _cell-option(cell, key, fallback) = {
+  if type(cell) == dictionary {
+    let value = cell.at(key, default: fallback)
+    if value == auto { fallback } else { value }
+  } else {
+    fallback
+  }
+}
+
+#let _cell-body(cell) = {
+  if cell == none or cell == auto {
+    none
+  } else if type(cell) == dictionary {
+    let body = cell.at("body", default: cell.at("content", default: none))
+    if body == auto { none } else { body }
+  } else {
+    cell
+  }
+}
+
+#let _cell-list(values, rows, cols) = {
+  if values == auto or values == none {
+    ()
+  } else {
+    let is-grid = (
+      type(values) == array and
+      values.len() == rows and
+      values.len() > 0 and
+      type(values.at(0)) == array and
+      values.at(0).len() == cols
+    )
+    if is-grid {
+      let out = ()
+      for row in values {
+        for cell in row { out.push(cell) }
+      }
+      out
+    } else {
+      ensure-array(values)
+    }
+  }
+}
+
+#let _cell-override(list, index, fallback) = {
+  if list.len() == 0 {
+    fallback
+  } else {
+    let value = list.at(index, default: fallback)
+    if value == auto or value == none { fallback } else { value }
+  }
+}
+
+#let _draw-table-cell(
+  body,
+  width,
+  height,
+  fill,
+  stroke,
+  radius,
+  inset,
+  text-size,
+  align-pos,
+  offset,
+  unit,
+) = {
+  let resolved-fill   = if fill == auto { none } else { fill }
+  let resolved-stroke = if stroke == auto { none } else { stroke }
+  let resolved-radius = if radius == auto { 0pt } else { radius }
+  let resolved-inset  = to-length(inset, unit: unit)
+  let (dx, dy)        = to-size(offset, unit: unit, default: (0pt, 0pt))
+  let resolved-text-size = if text-size == auto or text-size == none {
+    auto
+  } else if type(text-size) == int or type(text-size) == float {
+    text-size * 1em
+  } else {
+    text-size
+  }
+
+  let inner = if body == none {
+    none
+  } else {
+    let content = if resolved-text-size == auto {
+      body
+    } else {
+      text(size: resolved-text-size)[#body]
+    }
+    place(align-pos, dx: dx, dy: dy)[#content]
+  }
+
+  rect(width: width, height: height, fill: resolved-fill, stroke: resolved-stroke,
+       radius: resolved-radius)[
+    #box(width: width, height: height, inset: resolved-inset, clip: true)[#inner]
+  ]
+}
+
+#let _add-offset(a, b, unit) = {
+  let (ax, ay) = to-size(a, unit: unit, default: (0pt, 0pt))
+  let (bx, by) = to-size(b, unit: unit, default: (0pt, 0pt))
+  (ax + bx, ay + by)
+}
+
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATA NODES  (dataset · batch · tensor · vector · embedding)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -505,6 +631,194 @@
 
   ml-node(id, title: title, subtitle: subtitle, label: lbl,
           kind: "image-dataset", role: "data",
+          fill: none, stroke: none, shape: shapes.rect,
+          corner-radius: 0pt, inset: 0pt, unit: unit,
+          ..options.named())
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TABLE NODES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── table-cell ───────────────────────────────────────────────────────────────
+// Helper to override cell layout within a table-node.
+// Use with `cells:` or `cell-fn:` for per-cell alignment, padding, and styling.
+#let table-cell(
+  body,
+  align:  auto,
+  offset: auto,
+  inset:  auto,
+  text-size: auto,
+  fill:   auto,
+  stroke: auto,
+  radius: auto,
+) = (
+  body: body,
+  align: align,
+  offset: offset,
+  inset: inset,
+  text-size: text-size,
+  fill: fill,
+  stroke: stroke,
+  radius: radius,
+)
+
+
+// ─── table-node ───────────────────────────────────────────────────────────────
+// A grid-style node with explicit rows, columns, and cell content.
+// Use `cells` for row-major content or `cell-fn` to generate per-cell content.
+// Cell sizes and content placement can be tuned with the cell-* options.
+#let table-node(
+  id,
+  title:         auto,
+  subtitle:      none,
+  rows:          2,
+  columns:       2,
+  cells:         auto,
+  cell-fn:       none,
+  cell-size:     (1.1, 0.7),
+  cell-width:    auto,
+  cell-height:   auto,
+  column-widths: auto,
+  row-heights:   auto,
+  cell-gap:      0pt,
+  cell-inset:    2pt,
+  cell-align:    center + horizon,
+  cell-offset:   (0pt, 0pt),
+  cell-text-size: auto,
+  cell-shift:    (0pt, 0pt),
+  row-shifts:    auto,
+  column-shifts: auto,
+  cell-aligns:   auto,
+  cell-offsets:  auto,
+  cell-insets:   auto,
+  cell-text-sizes: auto,
+  cell-fill:     none,
+  cell-stroke:   rgb("#6b737d"),
+  cell-radius:   0pt,
+  caption-pos:   "bottom",
+  title-size:    0.78em,
+  subtitle-size: 0.64em,
+  title-gap:     2pt,
+  pos:           auto,
+  after:         none,
+  offset:        (0, 0),
+  unit:          default-unit,
+  ..options,
+) = {
+  let title = if title == auto { id } else { title }
+  let row-count = calc.max(1, rows)
+  let col-count = calc.max(1, columns)
+
+  let (cell-w, cell-h) = to-size(cell-size, width: cell-width, height: cell-height, unit: unit)
+  let col-widths = _size-list(column-widths, col-count, cell-w, unit)
+  let row-heights = _size-list(row-heights, row-count, cell-h, unit)
+  let resolved-gap = to-length(cell-gap, unit: unit)
+  let resolved-title-gap = to-length(title-gap, unit: unit)
+
+  let default-align = if cell-align == auto { center + horizon } else { cell-align }
+  let default-offset = if cell-offset == auto { (0pt, 0pt) } else { cell-offset }
+  let default-inset = if cell-inset == auto { 0pt } else { cell-inset }
+  let default-text-size = cell-text-size
+
+  let align-list = _cell-list(cell-aligns, row-count, col-count)
+  let offset-list = _cell-list(cell-offsets, row-count, col-count)
+  let inset-list = _cell-list(cell-insets, row-count, col-count)
+  let text-size-list = _cell-list(cell-text-sizes, row-count, col-count)
+
+  let row-shift-list = if row-shifts == auto or row-shifts == none { () } else { ensure-array(row-shifts) }
+  let col-shift-list = if column-shifts == auto or column-shifts == none { () } else { ensure-array(column-shifts) }
+
+  let raw-cells = ()
+  if cell-fn != none and type(cell-fn) == function {
+    for r in range(row-count) {
+      for c in range(col-count) {
+        raw-cells.push(cell-fn(r + 1, c + 1))
+      }
+    }
+  } else if cells != auto and cells != none {
+    if type(cells) == array and cells.len() > 0 and type(cells.at(0)) == array {
+      for row in cells {
+        for cell in row { raw-cells.push(cell) }
+      }
+    } else {
+      for cell in ensure-array(cells) { raw-cells.push(cell) }
+    }
+  }
+
+  let cell-items = ()
+  let total = row-count * col-count
+  for i in range(total) {
+    let cell = raw-cells.at(i, default: none)
+    let row = calc.floor(i / col-count)
+    let col = i - row * col-count
+    let body = _cell-body(cell)
+    let align-pos = _cell-option(cell, "align", _cell-override(align-list, i, default-align))
+    let offset = _cell-option(cell, "offset", _cell-override(offset-list, i, default-offset))
+    let row-shift = _cell-override(row-shift-list, row, (0pt, 0pt))
+    let col-shift = _cell-override(col-shift-list, col, (0pt, 0pt))
+    let resolved-offset = _add-offset(
+      _add-offset(
+        _add-offset(offset, cell-shift, unit),
+        row-shift,
+        unit,
+      ),
+      col-shift,
+      unit,
+    )
+    let inset = _cell-option(cell, "inset", _cell-override(inset-list, i, default-inset))
+    let text-size = _cell-option(cell, "text-size", _cell-override(text-size-list, i, default-text-size))
+    let fill = _cell-option(cell, "fill", cell-fill)
+    let stroke = _cell-option(cell, "stroke", cell-stroke)
+    let radius = _cell-option(cell, "radius", cell-radius)
+
+    cell-items.push(
+      _draw-table-cell(
+        body,
+        col-widths.at(col),
+        row-heights.at(row),
+        fill,
+        stroke,
+        radius,
+        inset,
+        text-size,
+        align-pos,
+        resolved-offset,
+        unit,
+      )
+    )
+  }
+
+  let grid-box = grid(
+    columns: col-widths,
+    rows: row-heights,
+    column-gutter: resolved-gap,
+    row-gutter: resolved-gap,
+    ..cell-items,
+  )
+
+  let caption = if title != none or subtitle != none {
+    pad(
+      top: if caption-pos == "bottom" { resolved-title-gap } else { 0pt },
+      bottom: if caption-pos == "top" { resolved-title-gap } else { 0pt },
+    )[
+      #_text-block(title, subtitle: subtitle,
+                   title-size: title-size, subtitle-size: subtitle-size)
+    ]
+  }
+
+  let lbl = if caption == none {
+    grid-box
+  } else if caption-pos == "top" {
+    stack(dir: ttb, spacing: 0pt, caption, grid-box)
+  } else {
+    stack(dir: ttb, spacing: 0pt, grid-box, caption)
+  }
+
+  ml-node(id, title: title, subtitle: subtitle, label: lbl,
+          kind: "table", role: "data",
+          pos: pos, after: after, offset: offset,
           fill: none, stroke: none, shape: shapes.rect,
           corner-radius: 0pt, inset: 0pt, unit: unit,
           ..options.named())

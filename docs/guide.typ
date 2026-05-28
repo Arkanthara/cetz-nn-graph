@@ -61,6 +61,7 @@ Useful constructors:
 
 - `dataset`, `batch`, `tensor`, `vector`, `embedding`
 - `image-node`, `image-dataset`
+- `table-node`, `table-cell`
 - `module`, `operation`, `layer`
 - `encoder`, `decoder`, `attention`, `transformer`
 - `io-node`, `decision`
@@ -149,6 +150,109 @@ Image nodes use Typst content inside Fletcher nodes.
 #image-node("sample", title: [Sample], src: "/assets/test.jpg")
 #image-dataset("train", title: [Training set], src: "/assets/test.jpg", stack: 4)
 ```
+
+== Tables
+
+Table nodes render grid-style blocks with per-cell content. Use `table-cell` to
+override alignment, padding, or styling on a single cell.
+
+```typ
+#let cells = (
+  (
+    table-cell([Class], align: left + horizon, inset: 3pt),
+    table-cell(text(size: 0.72em)[Cat]),
+    table-cell(text(size: 0.72em)[Dog]),
+  ),
+  ([Precision], [0.91], [0.88]),
+  ([Recall], [0.87], [0.90]),
+)
+
+#table-node(
+  "metrics",
+  title: [Metrics],
+  rows: 3,
+  columns: 3,
+  cells: cells,
+  column-widths: (1.6, 1.0, 1.0),
+  row-heights: (0.6, 0.6, 0.6),
+  cell-inset: 2pt,
+)
+```
+
+Shift all cell content at once (useful for visually centering glyphs with
+descenders like `p` or `g`):
+
+```typ
+#table-node(
+  "glyph",
+  rows: 1,
+  columns: 1,
+  cells: ([p],),
+  cell-aligns: (center + horizon,),
+  cell-shift: (0pt, -1pt),
+)
+```
+
+Change text size globally or per cell:
+
+```typ
+#table-node(
+  "sizes",
+  rows: 1,
+  columns: 3,
+  cells: ([a], [b], [c]),
+  cell-text-size: 1.2em,
+  cell-text-sizes: (0.9em, 1.2em, 1.6em),
+)
+```
+
+Shift entire rows or columns with a single list of offsets:
+
+```typ
+#table-node(
+  "shifted",
+  rows: 2,
+  columns: 3,
+  cells: ([p], [q], [b], [d], [e], [f]),
+  cell-aligns: (center + horizon, center + horizon, center + horizon,
+                center + horizon, center + horizon, center + horizon),
+  cell-text-size: 1.4em,
+  cell-shift: (0em, -0.3em),
+  row-shifts: ((0em, 0em), (0em, 0.4em)),
+  column-shifts: ((-0.2em, 0em), (0em, 0em), (0.2em, 0em)),
+)
+```
+
+Shortcuts for per-cell alignment and offsets (same row-major shape as `cells`):
+
+```typ
+#let letters = (
+  ("A", "B", "C"),
+  ("D", "E", "F"),
+)
+
+#let aligns = (
+  (left + top, center + top, right + top),
+  (left + bottom, center + horizon, right + bottom),
+)
+
+#let offsets = (
+  ((-2pt, -1pt), (0pt, -1pt), (2pt, -1pt)),
+  ((-2pt, 1pt), (0pt, 0pt), (2pt, 1pt)),
+)
+
+#table-node(
+  "letters",
+  rows: 2,
+  columns: 3,
+  cells: letters,
+  cell-aligns: aligns,
+  cell-offsets: offsets,
+  cell-size: (1.1, 0.7),
+)
+```
+
+You can also pass flat row-major lists for overrides (length = rows * columns).
 
 == Migration
 
