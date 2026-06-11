@@ -14,6 +14,20 @@
   }
 }
 
+#let _dedup-adjacent(vertices) = {
+  if vertices.len() <= 1 {
+    return vertices
+  }
+
+  let out = (vertices.at(0),)
+  for vertex in vertices.slice(1) {
+    if vertex != out.at(out.len() - 1) {
+      out.push(vertex)
+    }
+  }
+  out
+}
+
 #let _render-node(n) = {
   f-node(
     n.pos,
@@ -40,8 +54,20 @@
   let from-anchor = anchor-ref(e.from, side: e.from-side)
   let to-anchor   = anchor-ref(e.to,   side: e.to-side)
 
+  let via = if e.via == none {
+    ()
+  } else if type(e.via) == array {
+    e.via
+  } else {
+    (e.via,)
+  }
+
+  let via-is-route = via != () and via.all(v => type(v) == str and v.match(regex("^[utdblrnsew,]+$")) != none)
+
   // ── Build the vertex list ─────────────────────────────────────────────────
-  let vertices = if e.orthogonal != false {
+  let vertices = if via-is-route {
+    (from-anchor, ..via, to-anchor)
+  } else if e.orthogonal != false {
 
     // Determine the Fletcher bend-notation to use for each segment:
     //   "-|"  horizontal-first (go right/left until aligned, then turn)
@@ -51,7 +77,7 @@
     // Collect all required waypoints in order: source → via… → destination.
     // Via points are optional; omitting them yields a simple L-shaped path.
     let pts = (from-anchor,)
-    if e.via != none { pts += e.via }
+    if via != () { pts += via }
     pts.push(to-anchor)
 
     // For every consecutive pair (p1, p2), insert one orthogonal corner vertex.
@@ -65,15 +91,15 @@
       verts.push((p1, dir, p2)) // synthetic 90° corner
       verts.push(p2)
     }
-    verts
+    _dedup-adjacent(verts)
 
   } else {
 
     // Standard routing: chain anchors and raw via points as given.
     let verts = (from-anchor,)
-    if e.via != none { verts += e.via }
+    if via != () { verts += via }
     verts.push(to-anchor)
-    verts
+    _dedup-adjacent(verts)
 
   }
   // ─────────────────────────────────────────────────────────────────────────

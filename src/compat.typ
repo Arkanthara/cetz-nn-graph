@@ -46,6 +46,7 @@
   size: image-size,
   fill: color,
   pos: _legacy-pos(pos, after, y),
+  title-pos: title-position,
   ..options.named(),
 )
 
@@ -83,6 +84,7 @@
   unit: unit,
   fill: color,
   stroke: if border { rgb("#222222") } else { none },
+  title-pos: title-position,
   pos: _legacy-pos(pos, after, y),
   ..options.named(),
 )
@@ -123,6 +125,7 @@
   unit: unit,
   fill: color,
   stroke: if border { rgb("#222222") } else { none },
+  title-pos: title-position,
   pos: _legacy-pos(pos, after, y),
   ..options.named(),
 )

@@ -129,11 +129,41 @@
 //   "inside" → returns shape-box as-is (label already embedded inside)
 #let _compose(shape-box, text-lbl, pos, gap: 4pt) = {
   if pos == "above" {
-    stack(dir: ttb, spacing: gap, text-lbl, shape-box)
+    box(width: 0pt, height: 0pt)[
+      #shape-box
+      #place(top + center, dy: -gap)[#text-lbl]
+    ]
   } else if pos == "below" {
-    stack(dir: ttb, spacing: gap, shape-box, text-lbl)
+    box(width: 0pt, height: 0pt)[
+      #shape-box
+      #place(bottom + center, dy: gap)[#text-lbl]
+    ]
+  } else if pos == "left" {
+    box(width: 0pt, height: 0pt)[
+      #shape-box
+      #place(left + horizon, dx: -gap)[#text-lbl]
+    ]
+  } else if pos == "right" {
+    box(width: 0pt, height: 0pt)[
+      #shape-box
+      #place(right + horizon, dx: gap)[#text-lbl]
+    ]
   } else {
     shape-box   // "inside": label was embedded by _draw-stack / _draw-shape
+  }
+}
+
+#let _compose-title(title-lbl, pos) = {
+  if pos == "top" or pos == "above" {
+    align(top + center)[#title-lbl]
+  } else if pos == "bottom" or pos == "below" {
+    align(bottom + center)[#title-lbl]
+  } else if pos == "left" {
+    align(left + horizon)[#title-lbl]
+  } else if pos == "right" {
+    align(right + horizon)[#title-lbl]
+  } else {
+    title-lbl
   }
 }
 
@@ -141,8 +171,8 @@
 // ─── Image stack drawing ──────────────────────────────────────────────────────
 // Like _draw-stack but every layer is a full-cover image box instead of a rect.
 // The front copy (i = count-1, on top) sits at offset (0, 0); each step further
-// back adds (dx, dy).  No label is embedded — place the caption outside via
-// caption-pos in image-dataset.
+// back adds (dx, dy).  No label is embedded — place the title outside via
+// title-pos in image-dataset.
 #let _draw-image-stack(count, dx, dy, w, h, src, img, image-fit) = {
   let n = calc.max(1, count)
   box(width: w + dx * (n - 1), height: h + dy * (n - 1))[
@@ -354,6 +384,7 @@
   stack-dx:      2pt,
   stack-dy:      2pt,
   label-pos:     "inside",
+  title-pos:     auto,
   title-size:    0.92em,
   subtitle-size: 0.72em,
   title-gap:     4pt,
@@ -361,14 +392,15 @@
 ) = {
   let title    = if title == auto { id } else { title }
   let (w, h)   = to-size(size, unit: unit)
+  let resolved-title-pos = if title-pos == auto { "inside" } else { title-pos }
   let text-lbl = _text-block(title, subtitle: subtitle, badge: samples,
                               title-size: title-size, subtitle-size: subtitle-size)
 
-  let label = if label-pos == "inside" {
+  let label = if resolved-title-pos == "inside" {
     _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, 3pt, label: text-lbl)
   } else {
     let shape = _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, 3pt)
-    _compose(shape, text-lbl, label-pos, gap: title-gap)
+    box(width: w + stack-dx * (calc.max(1, stack) - 1), height: h + stack-dy * (calc.max(1, stack) - 1))[#_compose(shape, text-lbl, resolved-title-pos, gap: title-gap)]
   }
 
   ml-node(
@@ -446,6 +478,7 @@
   stack-dx:      2pt,
   stack-dy:      2pt,
   label-pos:     "inside",
+  title-pos:     auto,
   title-size:    0.92em,
   subtitle-size: 0.72em,
   title-gap:     4pt,
@@ -458,14 +491,15 @@
   let base-size  = if dir == "v" { (0.85, 2.2) } else { (2.2, 0.85) }
   let (w, h)     = to-size(if size == auto { base-size } else { size }, unit: unit)
   let radius     = calc.min(w, h) / 2
+  let resolved-title-pos = if title-pos == auto { label-pos } else { title-pos }
   let text-lbl   = _text-block(title, subtitle: subtitle,
                                 title-size: title-size, subtitle-size: subtitle-size)
 
-  let label = if label-pos == "inside" {
+  let label = if resolved-title-pos == "inside" {
     _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, radius, label: text-lbl)
   } else {
     let shape = _draw-stack(stack, stack-dx, stack-dy, w, h, fill, stroke, radius)
-    _compose(shape, text-lbl, label-pos, gap: title-gap)
+    box(width: w + stack-dx * (calc.max(1, stack) - 1), height: h + stack-dy * (calc.max(1, stack) - 1))[#_compose(shape, text-lbl, resolved-title-pos, gap: title-gap)]
   }
 
   ml-node(
@@ -503,7 +537,7 @@
 // Parameters
 // ──────────
 //   cover       When true the image fills the node; border is hidden.
-//   caption-pos "bottom" | "top" — caption placement when cover is true.
+//   title-pos   "bottom" | "top" — title placement when cover is true.
 //   title-gap   Spacing between image and caption text.
 #let image-node(
   id,
@@ -516,7 +550,8 @@
   image-height: auto,
   image-fit:    "cover",
   cover:        false,
-  caption-pos:  "bottom",
+  title-pos:    auto,
+  caption-pos:  auto,
   title-size:   0.78em,
   subtitle-size: 0.64em,
   title-gap:    auto,
@@ -527,6 +562,7 @@
 ) = {
   let title  = if title == auto { id } else { title }
   let (iw, ih) = to-size(image-size, width: image-width, height: image-height, unit: unit)
+  let resolved-title-pos = if title-pos == auto { if caption-pos == auto { "bottom" } else { caption-pos } } else { title-pos }
   let resolved-title-gap = if title-gap == auto {
     if cover { 2pt } else { 3pt }
   } else {
@@ -536,7 +572,7 @@
   if cover {
     let img-box = _image-box(src: src, img: img, width: iw, height: ih, fit: image-fit)
     let caption = if title != none or subtitle != none {
-      let pad-side = if caption-pos == "top" {
+      let pad-side = if resolved-title-pos == "top" {
         (bottom: resolved-title-gap)
       } else {
         (top: resolved-title-gap)
@@ -545,9 +581,18 @@
         #_text-block(title, subtitle: subtitle, title-size: title-size, subtitle-size: subtitle-size)
       ]
     }
-    let lbl = if caption == none       { img-box }
-              else if caption-pos == "top" { stack(dir: ttb, spacing: 0pt, caption, img-box) }
-              else                     { stack(dir: ttb, spacing: 0pt, img-box, caption) }
+    let lbl = if caption == none {
+      img-box
+    } else {
+      box(width: iw, height: ih)[
+        #img-box
+        #if resolved-title-pos == "top" {
+          place(top + center, dy: -resolved-title-gap)[#caption]
+        } else {
+          place(bottom + center, dy: resolved-title-gap)[#caption]
+        }
+      ]
+    }
 
     ml-node(id, title: title, subtitle: subtitle, label: lbl,
             kind: "image", role: "data",
@@ -568,7 +613,7 @@
 // ─── image-dataset ────────────────────────────────────────────────────────────
 // A stacked-image node: `stack` image copies rendered with (dx, dy) offsets,
 // each layer being a full-cover image (no border).  An optional caption is
-// placed above or below the whole stack via `caption-pos`.
+// placed above or below the whole stack via `title-pos`.
 //
 // Parameters
 // ──────────
@@ -580,7 +625,7 @@
 //   stack            Number of stacked copies (default 3; 1 = single card).
 //   stack-dx         Horizontal offset per layer (default 3pt).
 //   stack-dy         Vertical offset per layer   (default 3pt).
-//   caption-pos      "bottom" (default) | "top"
+//   title-pos        "bottom" (default) | "top"
 //   title-size /
 //   subtitle-size    Font sizes for the caption text.
 //   title-gap         Spacing between caption and image stack.
@@ -594,7 +639,8 @@
   image-width:   auto,
   image-height:  auto,
   image-fit:     "cover",
-  caption-pos:   "bottom",
+  title-pos:     auto,
+  caption-pos:   auto,
   stack:         3,
   stack-dx:      3pt,
   stack-dy:      3pt,
@@ -606,27 +652,33 @@
 ) = {
   let title    = if title == auto { id } else { title }
   let (iw, ih) = to-size(image-size, width: image-width, height: image-height, unit: unit)
+  let resolved-title-pos = if title-pos == auto { if caption-pos == auto { "bottom" } else { caption-pos } } else { title-pos }
 
   let img-stack = _draw-image-stack(stack, stack-dx, stack-dy, iw, ih, src, img, image-fit)
+  let stack-w = iw + stack-dx * (calc.max(1, stack) - 1)
+  let stack-h = ih + stack-dy * (calc.max(1, stack) - 1)
 
   let caption = if title != none or subtitle != none {
     pad(
-      top:    if caption-pos == "bottom" { title-gap } else { 0pt },
-      bottom: if caption-pos == "top"    { title-gap } else { 0pt },
+      top:    if resolved-title-pos == "bottom" { title-gap } else { 0pt },
+      bottom: if resolved-title-pos == "top"    { title-gap } else { 0pt },
     )[
       #_text-block(title, subtitle: subtitle,
                    title-size: title-size, subtitle-size: subtitle-size)
     ]
   }
 
-  // Compose caption + stack without calling the built-in stack() function
-  // (which is shadowed by the `stack` parameter in this scope).
   let lbl = if caption == none {
     img-stack
   } else {
-    let first  = if caption-pos == "top"    { caption }   else { img-stack }
-    let second = if caption-pos == "bottom" { caption }   else { img-stack }
-    grid(rows: (auto, auto), gutter: 0pt, first, second)
+    box(width: stack-w, height: stack-h)[
+      #img-stack
+      #if resolved-title-pos == "top" {
+        place(top + center, dy: -title-gap)[#caption]
+      } else {
+        place(bottom + center, dy: title-gap)[#caption]
+      }
+    ]
   }
 
   ml-node(id, title: title, subtitle: subtitle, label: lbl,
@@ -697,7 +749,8 @@
   cell-fill:     none,
   cell-stroke:   rgb("#6b737d"),
   cell-radius:   0pt,
-  caption-pos:   "bottom",
+  title-pos:     auto,
+  caption-pos:   auto,
   title-size:    0.78em,
   subtitle-size: 0.64em,
   title-gap:     2pt,
@@ -710,6 +763,7 @@
   let title = if title == auto { id } else { title }
   let row-count = calc.max(1, rows)
   let col-count = calc.max(1, columns)
+  let resolved-title-pos = if title-pos == auto { if caption-pos == auto { "bottom" } else { caption-pos } } else { title-pos }
 
   let (cell-w, cell-h) = to-size(cell-size, width: cell-width, height: cell-height, unit: unit)
   let col-widths = _size-list(column-widths, col-count, cell-w, unit)
@@ -800,8 +854,8 @@
 
   let caption = if title != none or subtitle != none {
     pad(
-      top: if caption-pos == "bottom" { resolved-title-gap } else { 0pt },
-      bottom: if caption-pos == "top" { resolved-title-gap } else { 0pt },
+      top: if resolved-title-pos == "bottom" { resolved-title-gap } else { 0pt },
+      bottom: if resolved-title-pos == "top" { resolved-title-gap } else { 0pt },
     )[
       #_text-block(title, subtitle: subtitle,
                    title-size: title-size, subtitle-size: subtitle-size)
@@ -810,10 +864,15 @@
 
   let lbl = if caption == none {
     grid-box
-  } else if caption-pos == "top" {
-    stack(dir: ttb, spacing: 0pt, caption, grid-box)
   } else {
-    stack(dir: ttb, spacing: 0pt, grid-box, caption)
+    box(width: grid-w, height: grid-h)[
+      #grid-box
+      #if resolved-title-pos == "top" {
+        place(top + center, dy: -resolved-title-gap)[#caption]
+      } else {
+        place(bottom + center, dy: resolved-title-gap)[#caption]
+      }
+    ]
   }
 
   ml-node(id, title: title, subtitle: subtitle, label: lbl,
@@ -906,7 +965,7 @@
     // Drawn mode: we paint the shape ourselves so that text can float outside.
     let (w, h) = to-size(if size == auto { (2.6, 1.4) } else { size }, unit: unit)
     let shape-box = _draw-shape(w, h, fill, stroke, shape-kind)
-    let lbl = _compose(shape-box, text-lbl, label-pos, gap: title-gap)
+    let lbl = box(width: w, height: h)[#_compose(shape-box, text-lbl, label-pos, gap: title-gap)]
     ml-node(id, title: title, subtitle: subtitle, label: lbl,
             kind: kind, role: role,
             fill: none, stroke: none, shape: shapes.rect,
@@ -932,7 +991,7 @@
   title:      if title == auto { id } else { title },
   subtitle:   subtitle,
   fill:       palette.encoder,
-  shape:      shapes.trapezium.with(dir: right, angle: 18deg),
+  shape:      shapes.trapezium.with(dir: right, angle: 40deg),
   shape-kind: "trapezium-r",
   ..options.named(),
 )
@@ -942,7 +1001,7 @@
   title:      if title == auto { id } else { title },
   subtitle:   subtitle,
   fill:       palette.decoder,
-  shape:      shapes.trapezium.with(dir: left, angle: 18deg),
+  shape:      shapes.trapezium.with(dir: left, angle: 40deg),
   shape-kind: "trapezium-l",
   ..options.named(),
 )
@@ -1175,11 +1234,14 @@
                    title-size: resolved-title-size,
                    subtitle-size: resolved-subtitle-size)
     ]
-    let lbl = if label-pos == "above" {
-      stack(dir: ttb, spacing: resolved-title-gap, caption, arrow-box)
-    } else {
-      stack(dir: ttb, spacing: resolved-title-gap, arrow-box, caption)
-    }
+    let lbl = box(width: w, height: h)[
+      #arrow-box
+      #if label-pos == "above" {
+        place(top + center, dy: -resolved-title-gap)[#caption]
+      } else {
+        place(bottom + center, dy: resolved-title-gap)[#caption]
+      }
+    ]
     ml-node(id, title: title, subtitle: subtitle, label: lbl,
             kind: "arrow", role: "operation",
             fill: none, stroke: none, shape: shapes.rect,
@@ -1210,7 +1272,7 @@
   title:         auto,
   subtitle:      none,
   badge:         none,
-  size:          (1.8, 1.8),
+  size:          (1.8, 3),
   fill:          palette.operation,
   stroke:        rgb("#7a5030"),
   label-pos:     "inside",
@@ -1252,17 +1314,29 @@
     tri-box(inner: text-lbl)
 
   } else if label-pos == "above" {
-    stack(dir: ttb, spacing: resolved-title-gap, align(center)[#text-lbl], tri-box())
+    box(width: w, height: h)[
+      #tri-box()
+      #place(top + center, dy: -resolved-title-gap)[#align(center)[#text-lbl]]
+    ]
 
   } else if label-pos == "below" {
-    stack(dir: ttb, spacing: resolved-title-gap, tri-box(), align(center)[#text-lbl])
+    box(width: w, height: h)[
+      #tri-box()
+      #place(bottom + center, dy: resolved-title-gap)[#align(center)[#text-lbl]]
+    ]
 
   } else if label-pos == "right" {
     // Text to the right of the tip — most natural for this shape
-    stack(dir: ltr, spacing: resolved-title-gap, tri-box(), align(left + horizon)[#text-lbl])
+    box(width: w, height: h)[
+      #tri-box()
+      #place(right + horizon, dx: resolved-title-gap)[#align(left + horizon)[#text-lbl]]
+    ]
 
   } else if label-pos == "left" {
-    stack(dir: ltr, spacing: resolved-title-gap, align(right + horizon)[#text-lbl], tri-box())
+    box(width: w, height: h)[
+      #tri-box()
+      #place(left + horizon, dx: -resolved-title-gap)[#align(right + horizon)[#text-lbl]]
+    ]
 
   } else {
     tri-box(inner: text-lbl)
@@ -1285,6 +1359,8 @@
   children,
   title:    auto,
   subtitle: none,
+  title-pos: "top",
+  title-shift: (0pt, 0pt),
   title-size: 0.92em,
   subtitle-size: 0.72em,
   title-gap: 8pt,
@@ -1294,11 +1370,20 @@
   ..options,
 ) = {
   let title = if title == auto { id } else { title }
+  let title-lbl = _compose-title(
+    _text-block(title, subtitle: subtitle,
+                title-size: title-size,
+                subtitle-size: subtitle-size),
+    title-pos,
+  )
+  let (title-dx, title-dy) = to-size(title-shift, unit: default-unit, default: (0pt, 0pt))
   ml-node(id,
           title: title, subtitle: subtitle,
-          label: _text-block(title, subtitle: subtitle,
-                              title-size: title-size,
-                              subtitle-size: subtitle-size),
+          label: if title-dx == 0pt and title-dy == 0pt {
+            title-lbl
+          } else {
+            place(dx: title-dx, dy: title-dy)[#title-lbl]
+          },
           kind: "group", role: "group",
           enclose: ensure-array(children).map(node-ref),
           fill: fill,
